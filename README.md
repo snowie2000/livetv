@@ -1,4 +1,5 @@
-# LiveTV
+# LiveTV 
+[中文](doc/Howto_cn.md)
 
 Aggregate IPTV feeds in one station and enjoy!
 
