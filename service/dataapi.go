@@ -5,8 +5,8 @@ import (
 	"errors"
 	"regexp"
 
+	"github.com/snowie2000/livetv/global"
 	"github.com/sosodev/duration"
-	"github.com/zjyl1994/livetv/global"
 	"google.golang.org/api/option"
 	"google.golang.org/api/youtube/v3"
 )

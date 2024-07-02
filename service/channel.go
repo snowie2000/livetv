@@ -5,8 +5,8 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/zjyl1994/livetv/global"
-	"github.com/zjyl1994/livetv/model"
+	"github.com/snowie2000/livetv/global"
+	"github.com/snowie2000/livetv/model"
 )
 
 func GetAllChannel() (channels []model.Channel, err error) {

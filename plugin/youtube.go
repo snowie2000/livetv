@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zjyl1994/livetv/model"
+	"github.com/snowie2000/livetv/model"
 
 	"github.com/dlclark/regexp2"
 )

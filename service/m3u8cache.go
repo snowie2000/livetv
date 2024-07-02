@@ -3,9 +3,9 @@ package service
 import (
 	"log"
 
-	"github.com/zjyl1994/livetv/model"
+	"github.com/snowie2000/livetv/model"
 
-	"github.com/zjyl1994/livetv/global"
+	"github.com/snowie2000/livetv/global"
 )
 
 var updateConcurrent = make(chan bool, 2) // allow up to 2 urls to be updated simultaneously

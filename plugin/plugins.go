@@ -18,8 +18,8 @@ import (
 	"golang.org/x/net/proxy"
 
 	"github.com/dlclark/regexp2"
-	"github.com/zjyl1994/livetv/global"
-	"github.com/zjyl1994/livetv/model"
+	"github.com/snowie2000/livetv/global"
+	"github.com/snowie2000/livetv/model"
 
 	"github.com/grafov/m3u8"
 )

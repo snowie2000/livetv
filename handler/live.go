@@ -12,14 +12,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zjyl1994/livetv/plugin"
+	"github.com/snowie2000/livetv/plugin"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
-	"github.com/zjyl1994/livetv/global"
-	"github.com/zjyl1994/livetv/model"
-	"github.com/zjyl1994/livetv/service"
-	"github.com/zjyl1994/livetv/util"
+	"github.com/snowie2000/livetv/global"
+	"github.com/snowie2000/livetv/model"
+	"github.com/snowie2000/livetv/service"
+	"github.com/snowie2000/livetv/util"
 )
 
 func M3UHandler(c *gin.Context) {

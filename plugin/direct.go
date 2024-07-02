@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zjyl1994/livetv/global"
-	"github.com/zjyl1994/livetv/model"
+	"github.com/snowie2000/livetv/global"
+	"github.com/snowie2000/livetv/model"
 )
 
 type DirectM3U8Parser struct{}

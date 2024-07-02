@@ -12,6 +12,7 @@ type Channel struct {
 	LastUpdate string
 	Status     int
 	Message    string
+	Category   string
 }
 
 type Config struct {

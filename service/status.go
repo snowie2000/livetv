@@ -3,7 +3,7 @@ package service
 import (
 	"time"
 
-	"github.com/zjyl1994/livetv/syncx"
+	"github.com/snowie2000/livetv/syncx"
 )
 
 type StatusInfo struct {

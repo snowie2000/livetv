@@ -16,9 +16,9 @@ import (
 
 	httpproxy "github.com/fopina/net-proxy-httpconnect/proxy"
 
-	"github.com/zjyl1994/livetv/global"
-	"github.com/zjyl1994/livetv/model"
-	"github.com/zjyl1994/livetv/plugin"
+	"github.com/snowie2000/livetv/global"
+	"github.com/snowie2000/livetv/model"
+	"github.com/snowie2000/livetv/plugin"
 )
 
 // A Dialer is a means to establish a connection.

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/zjyl1994/livetv/model"
+	"github.com/snowie2000/livetv/model"
 )
 
 type URLM3U8Parser struct {

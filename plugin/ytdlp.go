@@ -8,9 +8,9 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/zjyl1994/livetv/model"
+	"github.com/snowie2000/livetv/model"
 
-	"github.com/zjyl1994/livetv/global"
+	"github.com/snowie2000/livetv/global"
 )
 
 type YtDlpParser struct{}

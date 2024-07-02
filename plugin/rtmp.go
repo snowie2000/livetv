@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/nareix/joy5/av"
-	"github.com/zjyl1994/livetv/model"
+	"github.com/snowie2000/livetv/model"
 
 	"github.com/nareix/joy5/format/flv"
 	"github.com/nareix/joy5/format/rtmp"

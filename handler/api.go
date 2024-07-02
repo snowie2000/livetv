@@ -7,12 +7,12 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	freq "github.com/imroc/req/v3"
-	"github.com/zjyl1994/livetv/global"
-	"github.com/zjyl1994/livetv/model"
-	"github.com/zjyl1994/livetv/plugin"
-	"github.com/zjyl1994/livetv/recaptcha"
-	"github.com/zjyl1994/livetv/service"
-	"github.com/zjyl1994/livetv/util"
+	"github.com/snowie2000/livetv/global"
+	"github.com/snowie2000/livetv/model"
+	"github.com/snowie2000/livetv/plugin"
+	"github.com/snowie2000/livetv/recaptcha"
+	"github.com/snowie2000/livetv/service"
+	"github.com/snowie2000/livetv/util"
 	"io"
 	"log"
 	"mime"
@@ -244,6 +244,7 @@ func ChannelListHandler(c *gin.Context) {
 			LastUpdate: status.Time.Format("2006-01-02 15:04:05"),
 			Status:     status.Status,
 			Message:    status.Msg,
+			Category:   v.Category,
 		}
 	}
 	c.JSON(http.StatusOK, channels)
@@ -259,6 +260,7 @@ func NewChannelHandler(c *gin.Context) {
 	chParser := c.PostForm("parser")
 	chProxyUrl := c.PostForm("proxyurl")
 	chTsProxy := c.PostForm("tsproxy")
+	chCategory := c.PostForm("category")
 	if chName == "" || chURL == "" {
 		c.String(http.StatusBadRequest, "Incomplete channel info")
 		return
@@ -271,6 +273,7 @@ func NewChannelHandler(c *gin.Context) {
 		ProxyUrl: chProxyUrl,
 		Parser:   chParser,
 		TsProxy:  chTsProxy,
+		Category: chCategory,
 	}
 	err := service.SaveChannel(mch)
 	if err != nil {
@@ -310,6 +313,7 @@ func UpdateChannelHandler(c *gin.Context) {
 	chParser := c.PostForm("parser")
 	chProxyUrl := c.PostForm("proxyurl")
 	chTsProxy := c.PostForm("tsproxy")
+	chCategory := c.PostForm("category")
 	if chName == "" || chURL == "" {
 		c.String(http.StatusBadRequest, "Incomplete channel info")
 		return
@@ -321,6 +325,7 @@ func UpdateChannelHandler(c *gin.Context) {
 	channel.ProxyUrl = chProxyUrl
 	channel.URL = chURL
 	channel.TsProxy = chTsProxy
+	channel.Category = chCategory
 	err = service.SaveChannel(channel)
 	if err != nil {
 		log.Println(err.Error())
@@ -362,6 +367,15 @@ func GetConfigHandler(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, conf)
+}
+
+func CategoryHandler(c *gin.Context) {
+	if sessions.Default(c).Get("logined") != true {
+		c.String(http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	categories := global.GetAllCategories()
+	c.JSON(http.StatusOK, categories)
 }
 
 func UpdateConfigHandler(c *gin.Context) {

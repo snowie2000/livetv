@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 
 	"github.com/jinzhu/gorm"
-	"github.com/zjyl1994/livetv/model"
+	"github.com/snowie2000/livetv/model"
 	"golang.org/x/crypto/scrypt"
 )
 
@@ -54,7 +54,7 @@ func GetLiveToken() string {
 		if secret == "" {
 			return ""
 		}
-		derived := strongKey(secret+"_live")
+		derived := strongKey(secret + "_live")
 		strongLiveSecret = string([]rune(base64.URLEncoding.EncodeToString(derived))[1:10])
 	}
 	return strongLiveSecret

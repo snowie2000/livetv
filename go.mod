@@ -1,4 +1,4 @@
-module github.com/zjyl1994/livetv
+module github.com/snowie2000/livetv
 
 go 1.21
 

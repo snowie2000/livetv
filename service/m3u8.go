@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zjyl1994/livetv/global"
-	"github.com/zjyl1994/livetv/util"
+	"github.com/snowie2000/livetv/global"
+	"github.com/snowie2000/livetv/util"
 )
 
 var startUp int64 = 0

@@ -3,10 +3,10 @@ package global
 import (
 	"time"
 
-	"github.com/zjyl1994/livetv/model"
+	"github.com/snowie2000/livetv/model"
 
 	"github.com/patrickmn/go-cache"
-	"github.com/zjyl1994/livetv/syncx"
+	"github.com/snowie2000/livetv/syncx"
 )
 
 var defaultConfigValue = map[string]string{

@@ -22,7 +22,7 @@ var digitDriver = base64Captcha.DriverDigit{
 	Height:   50,
 	Width:    130,
 	Length:   4,   // captcha length
-	MaxSkew:  0.7, // italic strength
+	MaxSkew:  0.5, // italic strength
 	DotCount: 1,   // background noises
 }
 

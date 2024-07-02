@@ -10,6 +10,7 @@ type Channel struct {
 	TsProxy  string // new field for customized live.ts server
 	ProxyUrl string // proxy for server connection
 	Token    string `gorm:"-:all"`
+	Category string `gorm:"index"`
 }
 
 type LiveInfo struct {
