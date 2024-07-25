@@ -72,8 +72,11 @@ func processMediaPlaylist(playlistUrl string, pl *m3u8.MediaPlaylist, prefixURL 
 		return uri
 	}
 
-	var i uint
-	for i = pl.Count() - pl.WinSize(); i < pl.Count(); i++ {
+	var i uint = 0
+	if pl.Count() >= pl.WinSize() {
+		i = pl.Count() - pl.WinSize()
+	}
+	for ; i < pl.Count(); i++ {
 		pl.Segments[i].URI = handleUri(pl.Segments[i].URI)
 	}
 	// remove unused segments
