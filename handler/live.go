@@ -164,6 +164,8 @@ func LiveHandler(c *gin.Context) {
 			global.M3U8Cache.Set(channelCacheKey, m3u8Body, 3*time.Second)
 		}
 	}
+	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	c.Writer.Header().Set("Access-Control-Allow-Methods", "*")
 	c.Data(http.StatusOK, "application/vnd.apple.mpegurl", []byte(m3u8Body))
 }
 
@@ -235,6 +237,8 @@ func M3U8ProxyHandler(c *gin.Context) {
 	// make prefixURL from ourselves
 	prefixUrl, _ := global.GetConfig("base_url")
 	newList := service.M3U8Process(remoteURL, buffer.String(), prefixUrl, global.GetLiveToken(), true, nil)
+	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	c.Writer.Header().Set("Access-Control-Allow-Methods", "*")
 	c.Data(http.StatusOK, "application/vnd.apple.mpegurl", []byte(newList))
 }
 
@@ -299,6 +303,8 @@ func TsProxyHandler(c *gin.Context) {
 		}
 	}
 	defer resp.Body.Close()
+	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	c.Writer.Header().Set("Access-Control-Allow-Methods", "*")
 	c.Writer.WriteHeader(resp.StatusCode)
 	io.Copy(c.Writer, resp.Body)
 }

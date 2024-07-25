@@ -28,6 +28,9 @@ func (p *RTMPParser) Host(c *gin.Context, info *model.LiveInfo) error {
 	log.Println("Start transcoding", info.LiveUrl)
 	defer conn.Close()
 	defer log.Println("Transcoding finished")
+
+	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	c.Writer.Header().Set("Access-Control-Allow-Methods", "*")
 	c.Writer.Header().Set("Content-Type", "video/x-flv")
 	c.Writer.Header().Set("Transfer-Encoding", "chunked")
 	c.Writer.WriteHeader(200)

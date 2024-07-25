@@ -497,6 +497,16 @@ func LogoutHandler(c *gin.Context) {
 	c.String(http.StatusOK, "")
 }
 
+func CORSHandler(c *gin.Context) {
+	if strings.HasPrefix(c.Request.URL.Path, "/api") {
+		c.Status(http.StatusForbidden)
+		return
+	}
+	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+	c.Writer.Header().Set("Access-Control-Allow-Methods", "*")
+	c.Status(http.StatusOK)
+}
+
 func ChangePasswordHandler(c *gin.Context) {
 	if sessions.Default(c).Get("logined") != true {
 		c.String(http.StatusUnauthorized, "Unauthorized")

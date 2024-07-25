@@ -6,6 +6,7 @@ import (
 )
 
 func Register(r *gin.Engine) {
+	r.OPTIONS("/", handler.CORSHandler)
 	r.GET("/lives.m3u", handler.M3UHandler)
 	r.GET("/live.m3u8", handler.LiveHandler)
 	r.HEAD("/live.m3u8", handler.LivePreHandler)
