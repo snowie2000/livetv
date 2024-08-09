@@ -44,6 +44,11 @@ type FeedHost interface {
 	Host(c *gin.Context, info *model.LiveInfo) error
 }
 
+// Allow a plugin to generate a custom M3U8 playlist instead of requesting from the internet
+type Forger interface {
+	ForgeM3U8(info *model.LiveInfo) (baseUrl string, body string, err error)
+}
+
 // transform the tsproxy link
 type TsTransformer interface {
 	TransformTs(rawLink string, tsLink string, info *model.LiveInfo) string
