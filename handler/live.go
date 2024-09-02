@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"io"
 	"log"
@@ -40,6 +41,26 @@ func M3UHandler(c *gin.Context) {
 		return
 	}
 	c.Data(http.StatusOK, "application/vnd.apple.mpegurl", []byte(content))
+}
+
+func TXTHandler(c *gin.Context) {
+	disableProtection := os.Getenv("LIVETV_FREEACCESS") == "1"
+	// verify token against the unique token of the requested channel
+	if !disableProtection {
+		token := c.Query("token")
+		if token != global.GetSecretToken() { // invalid token
+			c.String(http.StatusForbidden, "Forbidden")
+			return
+		}
+	}
+
+	content, err := service.TXTGenerate()
+	if err != nil {
+		log.Println(err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	c.Data(http.StatusOK, "text/plain; charset=UTF-8", []byte(content))
 }
 
 func LivePreHandler(c *gin.Context) {
@@ -145,8 +166,18 @@ func LiveHandler(c *gin.Context) {
 			if handleNonHTTPProtocol(liveInfo.LiveUrl, c) {
 				return
 			}
-			// the GetM3U8Content will handle health-check, reparse, url decoration etc. and returns the final result and the final url used
-			bodyString, finalUrl, err := service.GetM3U8Content(channelInfo.URL, liveInfo.LiveUrl, channelInfo.ProxyUrl, channelInfo.Parser)
+
+			var (
+				bodyString string
+				finalUrl   string
+			)
+			if forger, ok := parser.(plugin.Forger); ok {
+				// if supported, use forged m3u8 playlist
+				finalUrl, bodyString, err = forger.ForgeM3U8(liveInfo)
+			} else {
+				// the GetM3U8Content will handle health-check, reparse, url decoration etc. and returns the final result and the final url used
+				bodyString, finalUrl, err = service.GetM3U8Content(channelInfo.URL, liveInfo.LiveUrl, channelInfo.ProxyUrl, channelInfo.Parser)
+			}
 			if bodyString == "" {
 				log.Println(err)
 				c.AbortWithStatus(http.StatusInternalServerError)
@@ -191,26 +222,15 @@ func M3U8ProxyHandler(c *gin.Context) {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
-	rurl, err := url.Parse(remoteURL)
+	_, err = url.Parse(remoteURL)
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
 
 	client := http.Client{Timeout: global.HttpClientTimeout}
-	req := c.Request.Clone(context.Background())
-	req.RequestURI = ""
-	req.Host = ""
-	req.URL = rurl
-	// remove x-forward-* headers
-	badKeys := make([]string, 0)
-	for key, _ := range req.Header {
-		if strings.HasPrefix(key, "X-") {
-			badKeys = append(badKeys, key)
-		}
-	}
-	for _, key := range badKeys {
-		req.Header.Del(key)
-	}
+	req, _ := http.NewRequest(http.MethodGet, remoteURL, nil)
+	req.Header.Set("User-Agent", plugin.DefaultUserAgent)
+	//req.Header.Set("Accept-Encoding", "gzip")
 	// added possible custom headers
 	queries := c.Request.URL.Query()
 	for key, value := range queries {
@@ -224,16 +244,22 @@ func M3U8ProxyHandler(c *gin.Context) {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-	for key, values := range resp.Header {
-		for _, value := range values {
-			if !strings.EqualFold(key, "Content-Length") && !strings.EqualFold(key, "Content-Encoding") {
-				c.Writer.Header().Add(key, value)
-			}
-		}
-	}
 	defer resp.Body.Close()
+	// deal with gzip
+	var reader io.ReadCloser
+	if resp.Header.Get("Content-Encoding") == "gzip" {
+		// If gzipped, create a new gzip reader
+		reader, err = gzip.NewReader(resp.Body)
+		if err != nil {
+			panic(err)
+		}
+		defer reader.Close()
+	} else {
+		// Otherwise, use the response body directly
+		reader = resp.Body
+	}
 	buffer := &bytes.Buffer{}
-	io.Copy(buffer, resp.Body)
+	io.Copy(buffer, reader)
 	// make prefixURL from ourselves
 	prefixUrl, _ := global.GetConfig("base_url")
 	newList := service.M3U8Process(remoteURL, buffer.String(), prefixUrl, global.GetLiveToken(), true, nil)

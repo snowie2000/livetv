@@ -62,6 +62,7 @@ func main() {
 	binding := os.Getenv("LIVETV_LISTEN")
 	if binding == "" {
 		binding = *listen
+		os.Setenv("LIVETV_LISTEN", binding)
 	}
 	rand.Seed(time.Now().UnixNano())
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
