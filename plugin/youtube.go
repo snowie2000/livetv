@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/snowie2000/livetv/global"
 	"github.com/snowie2000/livetv/model"
 
 	"github.com/dlclark/regexp2"
@@ -24,7 +25,7 @@ type YoutubeExtraInfo struct {
 func isLive(m3u8Url string, proxyUrl string) bool {
 	client := http.Client{
 		Timeout:   time.Second * 10,
-		Transport: transportWithProxy(proxyUrl),
+		Transport: global.TransportWithProxy(proxyUrl),
 	}
 	req, err := http.NewRequest("GET", m3u8Url, nil)
 	if err != nil {
@@ -48,7 +49,7 @@ func isLive(m3u8Url string, proxyUrl string) bool {
 func parseUrl(liveUrl string, proxyUrl string) (*model.LiveInfo, error) {
 	client := http.Client{
 		Timeout:   time.Second * 10,
-		Transport: transportWithProxy(proxyUrl),
+		Transport: global.TransportWithProxy(proxyUrl),
 	}
 	req, err := http.NewRequest("GET", liveUrl, nil)
 	if err != nil {

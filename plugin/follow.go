@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/snowie2000/livetv/global"
 	"github.com/snowie2000/livetv/model"
 )
 
@@ -16,7 +17,7 @@ type URLM3U8Parser struct {
 func (p *URLM3U8Parser) Parse(liveUrl string, proxyUrl string, previousExtraInfo string) (*model.LiveInfo, error) {
 	client := http.Client{
 		Timeout:   time.Second * 10,
-		Transport: transportWithProxy(proxyUrl),
+		Transport: global.TransportWithProxy(proxyUrl),
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},

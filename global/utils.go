@@ -2,9 +2,15 @@
 package global
 
 import (
+	"crypto/tls"
+	"log"
+	"net"
+	"net/http"
 	"net/url"
 	"path"
 	"strings"
+
+	"golang.org/x/net/proxy"
 )
 
 func GetBaseURL(rawURL string) string {
@@ -39,4 +45,24 @@ func MergeUrl(baseUrl string, partialUrl string) string {
 		return u.String() + partialUrl
 	}
 	return baseUrl + partialUrl
+}
+
+func TransportWithProxy(proxyUrl string) *http.Transport {
+	d := &net.Dialer{
+		Timeout: HttpClientTimeout,
+	}
+	tr := &http.Transport{
+		Dial:            d.Dial,
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	if proxyUrl != "" {
+		if u, err := url.Parse(proxyUrl); err == nil {
+			if p, e := proxy.FromURL(u, d); e == nil {
+				tr.Dial = p.Dial
+			} else {
+				log.Println("Proxy setup error:", e)
+			}
+		}
+	}
+	return tr
 }

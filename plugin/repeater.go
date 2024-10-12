@@ -35,7 +35,7 @@ func (p *RepeaterParser) Parse(liveUrl string, proxyUrl string, previousExtraInf
 
 	client := http.Client{
 		Timeout:   time.Second * 10,
-		Transport: transportWithProxy(proxyUrl),
+		Transport: global.TransportWithProxy(proxyUrl),
 	}
 	req, err := http.NewRequest("GET", liveUrl, nil)
 	if err != nil {

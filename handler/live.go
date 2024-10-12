@@ -185,7 +185,7 @@ func LiveHandler(c *gin.Context) {
 			}
 			iTsTransformer, _ := parser.(plugin.TsTransformer)
 			// get m3u8 content and transcode into tsproxy link if needed
-			m3u8Body = service.M3U8Process(finalUrl, bodyString, proxyUrl, global.GetLiveToken(), channelInfo.Proxy,
+			m3u8Body = service.M3U8Process(finalUrl, bodyString, proxyUrl, global.GetLiveToken(), channelInfo.Proxy, channelNumber,
 				func(raw string, ts string) string {
 					if iTsTransformer == nil {
 						return ts
@@ -212,6 +212,7 @@ func M3U8ProxyHandler(c *gin.Context) {
 	}
 
 	zippedRemoteURL := c.Query("k")
+	chNum := util.String2Uint(c.Query("c"))
 	remoteURL, err := util.DecompressString(zippedRemoteURL)
 	if err != nil {
 		log.Println(err)
@@ -222,12 +223,28 @@ func M3U8ProxyHandler(c *gin.Context) {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
+
 	_, err = url.Parse(remoteURL)
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
+		return
 	}
 
-	client := http.Client{Timeout: global.HttpClientTimeout}
+	channelInfo, err := service.GetChannel(chNum)
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			c.AbortWithStatus(http.StatusNotFound)
+		} else {
+			log.Println(err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	client := http.Client{
+		Timeout:   global.HttpClientTimeout,
+		Transport: global.TransportWithProxy(channelInfo.ProxyUrl),
+	}
 	req, _ := http.NewRequest(http.MethodGet, remoteURL, nil)
 	req.Header.Set("User-Agent", plugin.DefaultUserAgent)
 	//req.Header.Set("Accept-Encoding", "gzip")
@@ -262,7 +279,7 @@ func M3U8ProxyHandler(c *gin.Context) {
 	io.Copy(buffer, reader)
 	// make prefixURL from ourselves
 	prefixUrl, _ := global.GetConfig("base_url")
-	newList := service.M3U8Process(remoteURL, buffer.String(), prefixUrl, global.GetLiveToken(), true, nil)
+	newList := service.M3U8Process(remoteURL, buffer.String(), prefixUrl, global.GetLiveToken(), true, chNum, nil)
 	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 	c.Writer.Header().Set("Access-Control-Allow-Methods", "*")
 	c.Data(http.StatusOK, "application/vnd.apple.mpegurl", []byte(newList))
@@ -286,6 +303,7 @@ func TsProxyHandler(c *gin.Context) {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
+	chNum := util.String2Uint(c.Query("c"))
 	if remoteURL == "" {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
@@ -294,8 +312,21 @@ func TsProxyHandler(c *gin.Context) {
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
+	channelInfo, err := service.GetChannel(chNum)
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			c.AbortWithStatus(http.StatusNotFound)
+		} else {
+			log.Println(err)
+			c.AbortWithStatus(http.StatusInternalServerError)
+		}
+		return
+	}
 
-	client := http.Client{Timeout: global.HttpClientTimeout}
+	client := http.Client{
+		Timeout:   global.HttpClientTimeout,
+		Transport: global.TransportWithProxy(channelInfo.ProxyUrl),
+	}
 	req := c.Request.Clone(context.Background())
 	req.RequestURI = ""
 	req.Host = ""

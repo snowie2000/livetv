@@ -2,14 +2,16 @@ package plugin
 
 import (
 	"encoding/json"
-	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/nareix/joy5/av"
+	"github.com/snowie2000/livetv/global"
 	"github.com/snowie2000/livetv/model"
 
 	"github.com/nareix/joy5/format/flv"
@@ -28,7 +30,6 @@ func (p *RTMPParser) Host(c *gin.Context, info *model.LiveInfo) error {
 	log.Println("Start transcoding", info.LiveUrl)
 	defer conn.Close()
 	defer log.Println("Transcoding finished")
-
 	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 	c.Writer.Header().Set("Access-Control-Allow-Methods", "*")
 	c.Writer.Header().Set("Content-Type", "video/x-flv")
@@ -55,7 +56,7 @@ func (p *RTMPParser) Parse(liveUrl string, proxyUrl string, previousExtraInfo st
 	if err != nil || !strings.EqualFold(u.Scheme, "rtmp") {
 		client := http.Client{
 			Timeout:   time.Second * 10,
-			Transport: transportWithProxy(proxyUrl),
+			Transport: global.TransportWithProxy(proxyUrl),
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				return http.ErrUseLastResponse
 			},

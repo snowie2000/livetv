@@ -3,19 +3,17 @@ package plugin
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
-	"github.com/gin-gonic/gin"
 	"io"
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"strings"
+
+	"github.com/gin-gonic/gin"
 
 	httpproxy "github.com/fopina/net-proxy-httpconnect/proxy"
 	freq "github.com/imroc/req/v3"
-	"golang.org/x/net/proxy"
 
 	"github.com/dlclark/regexp2"
 	"github.com/snowie2000/livetv/global"
@@ -69,36 +67,21 @@ const (
 	DefaultUserAgent string = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
 
-func transportWithProxy(proxyUrl string) *http.Transport {
-	d := &net.Dialer{
-		Timeout: global.HttpClientTimeout,
-	}
-	tr := &http.Transport{
-		Dial:            d.Dial,
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	if proxyUrl != "" {
-		if u, err := url.Parse(proxyUrl); err == nil {
-			if p, e := proxy.FromURL(u, d); e == nil {
-				tr.Dial = p.Dial
-			} else {
-				log.Println("Proxy setup error:", e)
-			}
-		}
-	}
-	return tr
-}
-
 func registerPlugin(name string, parser Plugin) {
 	pluginCenter[name] = parser
 }
 
 func cloudScraper(req *http.Request, proxyUrl string) (*freq.Response, error) {
-	client := freq.C().ImpersonateChrome().SetCommonContentType("application/x-www-form-urlencoded; charset=UTF-8").SetCommonHeader("accept", "*/*")
+	client := freq.C().ImpersonateChrome() //.SetCommonContentType("application/x-www-form-urlencoded; charset=UTF-8").SetCommonHeader("accept", "*/*")
 	if proxyUrl != "" {
 		client.SetDial(func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return transportWithProxy(proxyUrl).Dial(network, addr)
+			return global.TransportWithProxy(proxyUrl).Dial(network, addr)
 		})
+	}
+	for k, v := range req.Header {
+		if len(v) > 0 {
+			client.Headers.Set(k, v[0])
+		}
 	}
 	switch req.Method {
 	case http.MethodGet:
@@ -158,7 +141,7 @@ func bestFromMasterPlaylist(masterUrl string, proxyUrl string, content ...io.Rea
 		}
 		playlist = resp.Body
 	}
-	p, listType, err := m3u8.DecodeFrom(playlist, true)
+	p, listType, err := m3u8.DecodeFrom(playlist, false)
 	// log.Println("parsed playlist", p == nil, listType, err)
 	if p == nil {
 		return "", err

@@ -19,7 +19,7 @@ type CaptchaData struct {
 }
 
 var digitDriver = base64Captcha.DriverDigit{
-	Height:   50,
+	Height:   52,
 	Width:    130,
 	Length:   4,   // captcha length
 	MaxSkew:  0.5, // italic strength

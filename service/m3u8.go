@@ -3,11 +3,12 @@ package service
 import (
 	"bytes"
 	"fmt"
-	"github.com/grafov/m3u8"
 	"net/url"
 	"path"
 	"strings"
 	"time"
+
+	"github.com/grafov/m3u8"
 
 	"github.com/snowie2000/livetv/global"
 	"github.com/snowie2000/livetv/util"
@@ -53,7 +54,7 @@ func cleanUrl(Url string) string {
 	return cleanURL
 }
 
-func processMediaPlaylist(playlistUrl string, pl *m3u8.MediaPlaylist, prefixURL string, proxyToken string, proxy bool, fnTransform func(raw string, ts string) string) string {
+func processMediaPlaylist(playlistUrl string, pl *m3u8.MediaPlaylist, prefixURL string, proxyToken string, proxy bool, channelNum uint, fnTransform func(raw string, ts string) string) string {
 	baseUrl := global.GetBaseURL(playlistUrl)
 	handleUri := func(uri string) string {
 		if uri == "" {
@@ -63,7 +64,7 @@ func processMediaPlaylist(playlistUrl string, pl *m3u8.MediaPlaylist, prefixURL 
 			uri = cleanUrl(global.MergeUrl(baseUrl, uri))
 		}
 		if proxy {
-			tsLink := global.MergeUrl(prefixURL, "/live.ts?token="+proxyToken+"&k="+util.CompressString(uri))
+			tsLink := global.MergeUrl(prefixURL, fmt.Sprintf("/live.ts?token=%s&k=%s&c=%d", proxyToken, util.CompressString(uri), channelNum))
 			if fnTransform != nil {
 				tsLink = fnTransform(uri, tsLink)
 			}
@@ -86,7 +87,7 @@ func processMediaPlaylist(playlistUrl string, pl *m3u8.MediaPlaylist, prefixURL 
 	return pl.Encode().String()
 }
 
-func processMasterPlaylist(playlistUrl string, pl *m3u8.MasterPlaylist, prefixURL string, proxyToken string, proxy bool, fnTransform func(raw string, ts string) string) string {
+func processMasterPlaylist(playlistUrl string, pl *m3u8.MasterPlaylist, prefixURL string, proxyToken string, proxy bool, channelNum uint, fnTransform func(raw string, ts string) string) string {
 	baseUrl := global.GetBaseURL(playlistUrl)
 	handleUri := func(uri string) string {
 		if uri == "" {
@@ -96,7 +97,7 @@ func processMasterPlaylist(playlistUrl string, pl *m3u8.MasterPlaylist, prefixUR
 			uri = cleanUrl(global.MergeUrl(baseUrl, uri))
 		}
 		if proxy {
-			plLink := global.MergeUrl(prefixURL, "/playlist.m3u8?token="+proxyToken+"&k="+util.CompressString(uri))
+			plLink := global.MergeUrl(prefixURL, fmt.Sprintf("/playlist.m3u8?token=%s&k=%s&c=%d", proxyToken, util.CompressString(uri), channelNum))
 			if fnTransform != nil {
 				plLink = fnTransform(uri, plLink)
 			}
@@ -116,14 +117,14 @@ func processMasterPlaylist(playlistUrl string, pl *m3u8.MasterPlaylist, prefixUR
 	return pl.Encode().String()
 }
 
-func M3U8Process(playlistUrl string, data string, prefixURL string, proxyToken string, proxy bool, fnTransform func(raw string, ts string) string) string {
-	p, listType, err := m3u8.DecodeFrom(bytes.NewBufferString(data), true)
+func M3U8Process(playlistUrl string, data string, prefixURL string, proxyToken string, proxy bool, channelNum uint, fnTransform func(raw string, ts string) string) string {
+	p, listType, err := m3u8.DecodeFrom(bytes.NewBufferString(data), false)
 	if err == nil {
 		switch listType {
 		case m3u8.MASTER:
-			return processMasterPlaylist(playlistUrl, p.(*m3u8.MasterPlaylist), prefixURL, proxyToken, proxy, fnTransform)
+			return processMasterPlaylist(playlistUrl, p.(*m3u8.MasterPlaylist), prefixURL, proxyToken, proxy, channelNum, fnTransform)
 		case m3u8.MEDIA:
-			return processMediaPlaylist(playlistUrl, p.(*m3u8.MediaPlaylist), prefixURL, proxyToken, proxy, fnTransform)
+			return processMediaPlaylist(playlistUrl, p.(*m3u8.MediaPlaylist), prefixURL, proxyToken, proxy, channelNum, fnTransform)
 		}
 	}
 	return ""
