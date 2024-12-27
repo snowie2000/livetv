@@ -2,7 +2,7 @@
 
 ## 解释器指令
 
-内置的httpRedirect解释器支持从源的返回值中读取规定的部分json指令，从而实现模拟头部通过认证等功能。
+内置的http解释器支持从源的返回值中读取规定的部分json指令，从而实现模拟头部通过认证等功能。
 
 以下为解释器支持的完整json格式：
 ```json
@@ -73,8 +73,21 @@ type FeedHost interface {
 }
 
 // 可选
+// 解析器可提供子节目列表（虚拟节目单），如果提供了该接口，将会在节目单中显示子节目
+// 同时该节目单本身会在列表中隐藏
+type ChannalProvider interface {
+	Channels(parentChannel *model.Channel, liveInfo *model.LiveInfo) []*model.Channel
+}
+
+// 可选
 // 对最终ts链接进行转换，可用于添加头部，自定义代理等
 type TsTransformer interface {
 	TransformTs(rawLink string, tsLink string, info *model.LiveInfo) string
+}
+
+// 可选
+// 允许解析器自由构建m3u8内容而不通过默认的从互联网获取m3u8
+type Forger interface {
+	ForgeM3U8(info *model.LiveInfo) (baseUrl string, body string, err error)
 }
 ```

@@ -7,22 +7,14 @@
 以下会对目前的每个解析器做相应的描述并帮助您选择正确的解析器。
 
 
-### httpRedirect
+### http
 用途：
+- 该解析器可以识别m3u8地址
 - 该解析器可以识别http跳转，解析出真实的m3u8地址
-- 如果您在php脚本中看到了类似`header('Location: https://某个网址/任何内容');`的代码，您应该选择这个解析器
+- 如果您的视频地址是一个http跳转，那么该解析器还能遵守地址返回的额外信息并模拟请求头
 - 该解析器可以解析主播放列表并自动选择其中质量最高的源
 
-判断方法：
-请执行以下命令
-```bash
-curl http://example.com/live.php?channel=xxx -vv 2>&1 | grep ocation
-```
-如果以上命令返回了类似这样的内容：
->  File STDIN:
-  < Location: http://（或https://）某个网址/任何内容
-
-则您应该选择`httpRedirect`解析器
+**变更：** 从1.4版本开始，旧版的httpRedirect和direct解析器已经合并，统一为http解析器，您不在需要区分源地址是哪种类型。
 
 ### rtmp
 用途：
@@ -32,21 +24,8 @@ curl http://example.com/live.php?channel=xxx -vv 2>&1 | grep ocation
 - **使用该解析器将通过livetv代理流，因此如果在云服务器上部署，请注意流量使用！**
 
 判断方法：
-- 在httpRedirect一节的命令中，如果返回值不是http或https开头，而是rtmp开头则您应该选择`rtmp`解析器
+- 在http一节的命令中，如果返回值不是http或https开头，而是rtmp开头则您应该选择`rtmp`解析器
 - 如果您的视频地址本来就是rtmp协议的，则您应该选择`rtmp`解析器
-
-### direct
-用途：
-- 该解析器接受一个m3u8地址，并补全地址后转发
-- 如果您的php脚本直接返回了m3u8地址，您应该选择这个解析器
-- 该解析器可以解析主播放列表并自动选择其中质量最高的源
-
-判断方法：
-请执行
-```bash
-curl http://example.com/live.php?channel=xxx -vv 2>&1 | grep M3U
-```
-如果以上命令返回了任意内容，则您应该选择`direct`解析器
 
 ### repeater
 用途：
@@ -57,6 +36,23 @@ curl http://example.com/live.php?channel=xxx -vv 2>&1 | grep M3U
 如果您的源是类似
 `http://example.com/xxx.m3u8`这样的地址，您应该选择`repeater`解析器
 
+### playlist
+用途：
+- 该解析器可以解析主播放列表并自动解析播放列表中包含的所有节目
+- 该解析器可以支持m3u格式和DIYP格式（tvbox，影视仓等也使用该格式）
+- 所有节目将自动使用http解析器解析，如果其中含有flv协议等将被识别为节目不在线
+- 所有播放列表中的节目将统一使用主播放列表选项中的设置来决定是否使用代理
+
+您可以使用本解析器将无法在当前网络访问或访问不佳的节目通过流代理转换为可以流畅播放的节目单
+
+### playlist-repeater
+用途：
+- 该解析器可以解析主播放列表并自动解析播放列表中包含的所有节目
+- 该解析器可以支持m3u格式和DIYP格式（tvbox，影视仓等也使用该格式）
+- 所有节目将自动使用repeater解析器解析，因此并不会对源节目进行任何代理和转换
+- 该解析器无法代理流
+
+由于repeater不能代理流，因此本解析器只能用作节目单归集管理使用，不能解决节目播放卡顿的问题，如有此需求请使用playlist解析器
 
 ### youtube
 用途：
