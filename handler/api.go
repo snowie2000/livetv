@@ -368,7 +368,6 @@ func UpdateChannelHandler(c *gin.Context) {
 	// check if the parser can provide sub channels
 	if p, err := plugin.GetPlugin(chParser); err == nil {
 		if _, ok := p.(plugin.ChannalProvider); ok {
-			log.Println("update channel: sub channel yes")
 			channel.HasSubChannel = true
 		}
 	}
@@ -387,7 +386,7 @@ func DeleteChannelHandler(c *gin.Context) {
 		c.String(http.StatusUnauthorized, "Unauthorized")
 		return
 	}
-	chID, chSubId := getChannelNumbers(c.PostForm("id"))
+	chID, chSubId := getChannelNumbers(c.Query("id"))
 	if chID == 0 {
 		c.String(http.StatusInternalServerError, "empty id")
 		return

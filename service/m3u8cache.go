@@ -3,12 +3,13 @@ package service
 import (
 	"log"
 
+	"github.com/LgoLgo/geentrant"
 	"github.com/snowie2000/livetv/global"
 	"github.com/snowie2000/livetv/model"
 	"github.com/snowie2000/livetv/plugin"
 )
 
-var updateConcurrent = make(chan bool, 2) // allow up to 2 urls to be updated simultaneously
+var updateConcurrent = &greetrant.RecursiveMutex{}
 
 func LoadChannelCache() {
 	channels, err := GetAllChannel()
@@ -35,9 +36,9 @@ func UpdateSubChannels(parentChannel *model.Channel, liveInfo *model.LiveInfo, P
 }
 
 func UpdateURLCacheSingle(channel *model.Channel, bUpdateStatus bool) (*model.LiveInfo, error) {
-	updateConcurrent <- true
+	updateConcurrent.Lock()
 	defer func() {
-		<-updateConcurrent
+		updateConcurrent.Unlock()
 	}()
 	log.Println("caching", channel.URL)
 	liveInfo, err := RealLiveM3U8(channel.URL, channel.ProxyUrl, channel.Parser)
@@ -53,8 +54,8 @@ func UpdateURLCacheSingle(channel *model.Channel, bUpdateStatus bool) (*model.Li
 		}
 		log.Println(channel.URL, "cached")
 
-		UpdateSubChannels(channel, liveInfo, channel.Parser, bUpdateStatus)
 		InvalidateChannelCache(channel.ChannelID)
+		UpdateSubChannels(channel, liveInfo, channel.Parser, bUpdateStatus)
 	}
 	return liveInfo, err
 }

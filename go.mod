@@ -5,13 +5,13 @@ go 1.22.0
 toolchain go1.22.7
 
 require (
+	github.com/LgoLgo/geentrant v0.1.0
 	github.com/dlclark/regexp2 v1.10.0
 	github.com/fopina/net-proxy-httpconnect v0.0.0-20230320235234-11f65320b851
 	github.com/gin-contrib/sessions v0.0.3
 	github.com/gin-gonic/gin v1.9.1
 	github.com/grafov/m3u8 v0.12.0
 	github.com/imroc/req/v3 v3.46.1
-	github.com/jamesnetherton/m3u v0.4.0
 	github.com/jinzhu/gorm v1.9.16
 	github.com/joho/godotenv v1.3.0
 	github.com/mojocn/base64Captcha v1.3.6
