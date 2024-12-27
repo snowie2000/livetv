@@ -64,12 +64,12 @@ func TXTHandler(c *gin.Context) {
 }
 
 func LivePreHandler(c *gin.Context) {
-	channelNumber := util.String2Uint(c.Query("c"))
+	channelNumber, subNumber := getChannelNumbers(c.Query("c"))
 	if channelNumber == 0 {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
-	_, err := service.GetChannel(channelNumber)
+	_, err := service.GetChannel(channelNumber, subNumber)
 	if err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			c.AbortWithStatus(http.StatusNotFound)
@@ -92,18 +92,34 @@ func handleNonHTTPProtocol(m3u8url string, c *gin.Context) (handled bool) {
 	return
 }
 
+// extract channel number and sub channel number from string
+func getChannelNumbers(ch string) (chMain int, chSub int) {
+	chMain = 0
+	chSub = -1
+	numbers := strings.Split(ch, "-")
+	if len(numbers) == 0 {
+		return
+	}
+	chMain, _ = strconv.Atoi(numbers[0])
+	if len(numbers) > 1 {
+		chSub, _ = strconv.Atoi(numbers[1])
+	}
+	return
+}
+
 func LiveHandler(c *gin.Context) {
 	channelCacheKey := c.Query("c")
+	channelNumber, subNumber := getChannelNumbers(channelCacheKey)
+	if channelNumber <= 0 { // invalid channel id format
+		c.AbortWithStatus(http.StatusBadRequest)
+		return
+	}
+
 	disableProtection := os.Getenv("LIVETV_FREEACCESS") == "1"
 	// verify token against the unique token of the requested channel
 	if !disableProtection {
 		token := c.Query("token")
-		channelNumber, err := strconv.Atoi(channelCacheKey)
-		if err != nil { // invalid channel id format
-			c.AbortWithError(http.StatusBadRequest, err)
-			return
-		}
-		ch, err := service.GetChannel(uint(channelNumber))
+		ch, err := service.GetChannel(channelNumber, subNumber)
 		if err != nil { // non-existent channel
 			c.AbortWithError(http.StatusBadRequest, err)
 			return
@@ -119,12 +135,11 @@ func LiveHandler(c *gin.Context) {
 	if found {
 		m3u8Body = iBody.(string)
 	} else {
-		channelNumber := util.String2Uint(c.Query("c"))
 		if channelNumber == 0 {
 			c.AbortWithStatus(http.StatusNotFound)
 			return
 		}
-		channelInfo, err := service.GetChannel(channelNumber)
+		channelInfo, err := service.GetChannel(channelNumber, subNumber)
 		if err != nil {
 			if gorm.IsRecordNotFoundError(err) {
 				c.AbortWithStatus(http.StatusNotFound)
@@ -134,16 +149,16 @@ func LiveHandler(c *gin.Context) {
 			}
 			return
 		}
-		baseUrl, err := global.GetConfig("base_url")
-		if err != nil {
-			log.Println(err)
-			c.AbortWithStatus(http.StatusInternalServerError)
-			return
-		}
+		// baseUrl, err := global.GetConfig("base_url")
+		// if err != nil {
+		// 	log.Println(err)
+		// 	c.AbortWithStatus(http.StatusInternalServerError)
+		// 	return
+		// }
 		proxyUrl := channelInfo.TsProxy
-		if proxyUrl == "" {
-			proxyUrl = baseUrl
-		}
+		// if proxyUrl == "" {
+		// 	proxyUrl = baseUrl
+		// }
 		liveInfo, err := service.GetLiveM3U8(channelInfo.URL, channelInfo.ProxyUrl, channelInfo.Parser)
 		if err != nil {
 			log.Println(err)
@@ -212,7 +227,7 @@ func M3U8ProxyHandler(c *gin.Context) {
 	}
 
 	zippedRemoteURL := c.Query("k")
-	chNum := util.String2Uint(c.Query("c"))
+	chNum, chSub := getChannelNumbers(c.Query("c"))
 	remoteURL, err := util.DecompressString(zippedRemoteURL)
 	if err != nil {
 		log.Println(err)
@@ -230,7 +245,7 @@ func M3U8ProxyHandler(c *gin.Context) {
 		return
 	}
 
-	channelInfo, err := service.GetChannel(chNum)
+	channelInfo, err := service.GetChannel(chNum, chSub)
 	if err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			c.AbortWithStatus(http.StatusNotFound)
@@ -278,8 +293,8 @@ func M3U8ProxyHandler(c *gin.Context) {
 	buffer := &bytes.Buffer{}
 	io.Copy(buffer, reader)
 	// make prefixURL from ourselves
-	prefixUrl, _ := global.GetConfig("base_url")
-	newList := service.M3U8Process(remoteURL, buffer.String(), prefixUrl, global.GetLiveToken(), true, chNum, nil)
+	// prefixUrl, _ := global.GetConfig("base_url")
+	newList := service.M3U8Process(remoteURL, buffer.String(), "", global.GetLiveToken(), true, chNum, nil)
 	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 	c.Writer.Header().Set("Access-Control-Allow-Methods", "*")
 	c.Data(http.StatusOK, "application/vnd.apple.mpegurl", []byte(newList))
@@ -303,7 +318,7 @@ func TsProxyHandler(c *gin.Context) {
 		c.AbortWithStatus(http.StatusInternalServerError)
 		return
 	}
-	chNum := util.String2Uint(c.Query("c"))
+	chNum, chSub := getChannelNumbers(c.Query("c"))
 	if remoteURL == "" {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
@@ -312,7 +327,7 @@ func TsProxyHandler(c *gin.Context) {
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 	}
-	channelInfo, err := service.GetChannel(chNum)
+	channelInfo, err := service.GetChannel(chNum, chSub)
 	if err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			c.AbortWithStatus(http.StatusNotFound)

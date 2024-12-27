@@ -1,7 +1,7 @@
 package handler
 
 type Channel struct {
-	ID         uint
+	ID         string
 	Name       string
 	URL        string
 	M3U8       string
@@ -13,6 +13,8 @@ type Channel struct {
 	Status     int
 	Message    string
 	Category   string
+	Virtual    bool
+	Children   []Channel `json:"children"`
 }
 
 type Config struct {

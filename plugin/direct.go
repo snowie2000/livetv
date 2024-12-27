@@ -3,11 +3,10 @@ package plugin
 
 import (
 	"encoding/json"
-	"log"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/snowie2000/livetv/global"
 	"github.com/snowie2000/livetv/model"
@@ -39,7 +38,7 @@ func (p *DirectM3U8Parser) TransformTs(rawLink string, tsLink string, info *mode
 	return tsLink
 }
 
-func (p *DirectM3U8Parser) Parse(liveUrl string, proxyUrl string, previousExtraInfo string) (*model.LiveInfo, error) {
+func (p *DirectM3U8Parser) Parse(liveUrl string, proxyUrl string, previousExtraInfo string, content io.Reader) (*model.LiveInfo, error) {
 	u, err := url.Parse(liveUrl)
 	if err != nil {
 		return nil, err
@@ -51,42 +50,35 @@ func (p *DirectM3U8Parser) Parse(liveUrl string, proxyUrl string, previousExtraI
 		return li, nil
 	}
 
-	client := http.Client{
-		Timeout:   time.Second * 10,
-		Transport: global.TransportWithProxy(proxyUrl),
-	}
-	req, err := http.NewRequest("GET", liveUrl, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", DefaultUserAgent)
-	// allow adding custom transformations
-	p.Transform(req, &model.LiveInfo{
-		ExtraInfo: previousExtraInfo,
-	})
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-	// the link itself is a valid M3U8
-	if strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "mpegurl") {
-		log.Println(liveUrl, "is a valid url")
-		liveUrl, err := bestFromMasterPlaylist(liveUrl, proxyUrl, resp.Body) // extract the best quality live url from the master playlist
-		if err == nil {
-			li := &model.LiveInfo{}
-			if !global.IsValidURL(liveUrl) {
-				liveUrl = global.GetBaseURL(liveUrl) + liveUrl
-			}
-			li.LiveUrl = liveUrl
-			li.ExtraInfo = previousExtraInfo
-			return li, nil
+	if content == nil {
+		req, err := http.NewRequest("GET", liveUrl, nil)
+		if err != nil {
+			return nil, err
 		}
-	}
-	return nil, NoMatchFeed
-}
+		req.Header.Set("User-Agent", DefaultUserAgent)
+		// allow adding custom transformations
+		p.Transform(req, &model.LiveInfo{
+			ExtraInfo: previousExtraInfo,
+		})
+		resp, err := cloudScraper(req, proxyUrl) // client.Do(req)
+		if err != nil {
+			return nil, err
+		}
 
-func init() {
-	registerPlugin("direct", &DirectM3U8Parser{})
+		content = resp.Body
+		defer resp.Body.Close()
+	}
+
+	bestUrl, err := bestFromMasterPlaylist(liveUrl, proxyUrl, content) // extract the best quality live url from the master playlist
+	if err == nil {
+		li := &model.LiveInfo{}
+		if !global.IsValidURL(bestUrl) {
+			bestUrl = global.GetBaseURL(bestUrl) + bestUrl
+		}
+		li.LiveUrl = bestUrl
+		li.ExtraInfo = previousExtraInfo
+		return li, nil
+	}
+
+	return nil, NoMatchFeed
 }

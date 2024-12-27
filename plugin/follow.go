@@ -3,7 +3,9 @@ package plugin
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/snowie2000/livetv/global"
@@ -32,24 +34,35 @@ func (p *URLM3U8Parser) Parse(liveUrl string, proxyUrl string, previousExtraInfo
 		return nil, err
 	}
 	defer resp.Body.Close()
-	var ui UrlInfo
-	decoder := json.NewDecoder(resp.Body)
-	if decoder.Decode(&ui) == nil && len(ui.Headers) > 0 {
-		js, _ := json.Marshal(ui)
-		previousExtraInfo = string(js) // write headers info to extraInfo
-	}
-
 	redir := resp.Header.Get("Location")
-	if redir == "" {
-		return nil, NoMatchFeed
+	if redir != "" {
+		// unpack previousExtraInfo
+		var pei UrlInfo
+		json.Unmarshal([]byte(previousExtraInfo), &pei)
+		if pei.RedirectCounter > 5 {
+			return nil, errors.New("Too many redirections")
+		}
+
+		var ui UrlInfo
+		decoder := json.NewDecoder(resp.Body)
+		if decoder.Decode(&ui) == nil && len(ui.Headers) > 0 {
+			ui.RedirectCounter = pei.RedirectCounter + 1
+			js, _ := json.Marshal(ui)
+			previousExtraInfo = string(js) // write headers info to extraInfo
+		}
+		info, err := p.Parse(redir, proxyUrl, previousExtraInfo) // recursive call the parser to follow redirections
+		if err == nil && info != nil {
+			info.Logo = ui.Logo
+		}
+		return info, err
 	}
-	info, err := p.DirectM3U8Parser.Parse(redir, proxyUrl, previousExtraInfo)
-	if err == nil && info != nil {
-		info.Logo = ui.Logo
+	// this is a direct m3u8 url, let's parse the content
+	if strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "mpegurl") {
+		return p.DirectM3U8Parser.Parse(liveUrl, proxyUrl, previousExtraInfo, resp.Body)
 	}
-	return info, err
+	return nil, errors.New("Invalid feed: " + resp.Header.Get("Content-Type"))
 }
 
 func init() {
-	registerPlugin("httpRedirect", &URLM3U8Parser{})
+	registerPlugin("http", &URLM3U8Parser{}, 0)
 }

@@ -66,5 +66,5 @@ func (p *RepeaterParser) Parse(liveUrl string, proxyUrl string, previousExtraInf
 }
 
 func init() {
-	registerPlugin("repeater", &RepeaterParser{})
+	registerPlugin("repeater", &RepeaterParser{}, 6)
 }

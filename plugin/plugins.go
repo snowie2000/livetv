@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -25,6 +26,10 @@ import (
 // plugin parser interface
 type Plugin interface {
 	Parse(liveUrl string, proxyUrl string, previousExtraInfo string) (info *model.LiveInfo, error error)
+}
+
+type ChannalProvider interface {
+	Channels(parentChannel *model.Channel, liveInfo *model.LiveInfo) []*model.Channel
 }
 
 // transform the request before getM3U8content
@@ -53,26 +58,32 @@ type TsTransformer interface {
 }
 
 type UrlInfo struct {
-	Headers map[string]string `json:"headers"`
-	Logo    string            `json:"logo"`
+	Headers         map[string]string `json:"headers"`
+	Logo            string            `json:"logo"`
+	RedirectCounter int32             `json:"redir"`
+}
+
+type pluginInfo struct {
+	instance Plugin
+	priority int
 }
 
 var (
-	pluginCenter  map[string]Plugin = make(map[string]Plugin)
-	NoMatchPlugin error             = errors.New("No matching plugin found")
-	NoMatchFeed   error             = errors.New("This channel is not currently live")
+	pluginCenter  map[string]pluginInfo = make(map[string]pluginInfo)
+	NoMatchPlugin error                 = errors.New("No matching plugin found")
+	NoMatchFeed   error                 = errors.New("This channel is not currently live")
 )
 
 const (
 	DefaultUserAgent string = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
 
-func registerPlugin(name string, parser Plugin) {
-	pluginCenter[name] = parser
+func registerPlugin(name string, parser Plugin, priority int) {
+	pluginCenter[name] = pluginInfo{parser, priority}
 }
 
 func cloudScraper(req *http.Request, proxyUrl string) (*freq.Response, error) {
-	client := freq.C().ImpersonateChrome() //.SetCommonContentType("application/x-www-form-urlencoded; charset=UTF-8").SetCommonHeader("accept", "*/*")
+	client := freq.C().ImpersonateFirefox() //.SetCommonContentType("application/x-www-form-urlencoded; charset=UTF-8").SetCommonHeader("accept", "*/*")
 	if proxyUrl != "" {
 		client.SetDial(func(ctx context.Context, network, addr string) (net.Conn, error) {
 			return global.TransportWithProxy(proxyUrl).Dial(network, addr)
@@ -195,7 +206,7 @@ func getYouTubeChannelID(url string) string {
 
 func GetPlugin(name string) (Plugin, error) {
 	if p, ok := pluginCenter[name]; ok {
-		return p, nil
+		return p.instance, nil
 	}
 	log.Println(name, "not found")
 	return nil, NoMatchPlugin
@@ -206,6 +217,9 @@ func GetPluginList() []string {
 	for name, _ := range pluginCenter {
 		list = append(list, name)
 	}
+	sort.Slice(list, func(a, b int) bool {
+		return pluginCenter[list[a]].priority < pluginCenter[list[b]].priority
+	})
 	return list
 }
 

@@ -17,6 +17,10 @@ func InitDB(filepath string) (err error) {
 	if err != nil {
 		return err
 	}
+	// update old parsers to their new names
+	DB.Model(&model.Channel{}).Where("parser IN (?)", []string{"httpRedirect", "direct"}).Update("parser", "http")
+	
+	// set default value for configs
 	for key, valueDefault := range defaultConfigValue {
 		var valueInDB model.Config
 		err = DB.Where("name = ?", key).First(&valueInDB).Error

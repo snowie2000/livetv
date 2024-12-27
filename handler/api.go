@@ -4,6 +4,14 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"io"
+	"log"
+	"mime"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	freq "github.com/imroc/req/v3"
@@ -13,13 +21,6 @@ import (
 	"github.com/snowie2000/livetv/recaptcha"
 	"github.com/snowie2000/livetv/service"
 	"github.com/snowie2000/livetv/util"
-	"io"
-	"log"
-	"mime"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"golang.org/x/text/language"
 )
@@ -107,7 +108,7 @@ func FetchHandler(c *gin.Context) {
 		client.ImpersonateChrome()
 	}
 	if resp, err := client.R().Get(url); err != nil {
-		c.AbortWithError(resp.StatusCode, err)
+		c.AbortWithError(http.StatusBadGateway, err)
 		return
 	} else {
 		for k, v := range resp.Header {
@@ -225,15 +226,15 @@ func ChannelListHandler(c *gin.Context) {
 	}
 	channels := make([]Channel, len(channelModels)+1)
 	channels[0] = Channel{
-		ID:     0,
+		ID:     "0",
 		Name:   "playlist",
 		M3U8:   fmt.Sprintf("%s/lives.m3u?token=%s", baseUrl, global.GetSecretToken()),
 		Status: service.Ok,
 	}
 	for i, v := range channelModels {
 		status := service.GetStatus(v.URL)
-		channels[i+1] = Channel{
-			ID:         v.ID,
+		ch := Channel{
+			ID:         v.ChannelID,
 			Name:       v.Name,
 			URL:        v.URL,
 			Parser:     v.Parser,
@@ -246,6 +247,31 @@ func ChannelListHandler(c *gin.Context) {
 			Message:    status.Msg,
 			Category:   v.Category,
 		}
+		if len(v.Children) > 0 {
+			list := []Channel{}
+			for _, sub := range v.Children {
+				status := service.GetStatus(sub.URL)
+				subID := fmt.Sprintf("%d-%d", v.ID, sub.ID)
+				c := Channel{
+					ID:         sub.ChannelID,
+					Name:       sub.Name,
+					URL:        sub.URL,
+					Parser:     sub.Parser,
+					TsProxy:    sub.TsProxy,
+					M3U8:       fmt.Sprintf("%s/live.m3u8?token=%s&c=%s", baseUrl, sub.Token, subID),
+					Proxy:      sub.Proxy,
+					ProxyUrl:   sub.ProxyUrl,
+					LastUpdate: status.Time.Format("2006-01-02 15:04:05"),
+					Status:     status.Status,
+					Message:    status.Msg,
+					Category:   sub.Category,
+					Virtual:    true, // sub channels are all virtual
+				}
+				list = append(list, c)
+			}
+			ch.Children = list
+		}
+		channels[i+1] = ch
 	}
 	c.JSON(http.StatusOK, channels)
 }
@@ -266,14 +292,21 @@ func NewChannelHandler(c *gin.Context) {
 		return
 	}
 	chProxy := c.PostForm("proxy") != ""
-	mch := model.Channel{
-		Name:     chName,
-		URL:      chURL,
-		Proxy:    chProxy,
-		ProxyUrl: chProxyUrl,
-		Parser:   chParser,
-		TsProxy:  chTsProxy,
-		Category: chCategory,
+	mch := &model.Channel{
+		Name:          chName,
+		URL:           chURL,
+		Proxy:         chProxy,
+		ProxyUrl:      chProxyUrl,
+		Parser:        chParser,
+		TsProxy:       chTsProxy,
+		Category:      chCategory,
+		HasSubChannel: false,
+	}
+	// check if the parser can provide sub channels
+	if p, err := plugin.GetPlugin(chParser); err == nil {
+		if _, ok := p.(plugin.ChannalProvider); ok {
+			mch.HasSubChannel = true
+		}
 	}
 	err := service.SaveChannel(mch)
 	if err != nil {
@@ -282,7 +315,7 @@ func NewChannelHandler(c *gin.Context) {
 		return
 	}
 	c.String(http.StatusOK, "")
-	go service.UpdateURLCacheSingle(chURL, chProxyUrl, chParser, true) // update liveURL on adding new channel
+	go service.UpdateURLCacheSingle(mch, true) // update liveURL on adding new channel
 }
 
 func AuthProbeHandler(c *gin.Context) {
@@ -298,12 +331,16 @@ func UpdateChannelHandler(c *gin.Context) {
 		c.String(http.StatusUnauthorized, "Unauthorized")
 		return
 	}
-	chID := util.String2Uint(c.PostForm("id"))
+	chID, chSubId := getChannelNumbers(c.PostForm("id"))
 	if chID == 0 {
 		c.String(http.StatusInternalServerError, "empty id")
 		return
 	}
-	channel, err := service.GetChannel(chID)
+	if chSubId >= 0 {
+		c.String(http.StatusInternalServerError, "can't update sub channels")
+		return
+	}
+	channel, err := service.GetChannel(chID, -1)
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
 		return
@@ -326,6 +363,15 @@ func UpdateChannelHandler(c *gin.Context) {
 	channel.URL = chURL
 	channel.TsProxy = chTsProxy
 	channel.Category = chCategory
+	channel.HasSubChannel = false
+
+	// check if the parser can provide sub channels
+	if p, err := plugin.GetPlugin(chParser); err == nil {
+		if _, ok := p.(plugin.ChannalProvider); ok {
+			log.Println("update channel: sub channel yes")
+			channel.HasSubChannel = true
+		}
+	}
 	err = service.SaveChannel(channel)
 	if err != nil {
 		log.Println(err.Error())
@@ -333,7 +379,7 @@ func UpdateChannelHandler(c *gin.Context) {
 		return
 	}
 	c.String(http.StatusOK, "")
-	go service.UpdateURLCacheSingle(chURL, chProxyUrl, chParser, true) // update liveURL on updating new channel
+	go service.UpdateURLCacheSingle(channel, true) // update liveURL on updating new channel
 }
 
 func DeleteChannelHandler(c *gin.Context) {
@@ -341,9 +387,13 @@ func DeleteChannelHandler(c *gin.Context) {
 		c.String(http.StatusUnauthorized, "Unauthorized")
 		return
 	}
-	chID := util.String2Uint(c.Query("id"))
+	chID, chSubId := getChannelNumbers(c.PostForm("id"))
 	if chID == 0 {
 		c.String(http.StatusInternalServerError, "empty id")
+		return
+	}
+	if chSubId >= 0 {
+		c.String(http.StatusInternalServerError, "can't delete sub channels")
 		return
 	}
 	err := service.DeleteChannel(chID)

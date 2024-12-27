@@ -128,5 +128,5 @@ func (p *YoutubeParser) Parse(liveUrl string, proxyUrl string, previousExtraInfo
 }
 
 func init() {
-	registerPlugin("youtube", &YoutubeParser{})
+	registerPlugin("youtube", &YoutubeParser{}, 2)
 }

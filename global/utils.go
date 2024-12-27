@@ -37,14 +37,22 @@ func IsValidURL(u string) bool {
 }
 
 func MergeUrl(baseUrl string, partialUrl string) string {
+	if baseUrl == "" {
+		return partialUrl
+	}
+
 	if strings.HasPrefix(partialUrl, "/") {
 		u, _ := url.Parse(baseUrl)
 		u.Path = ""
 		u.RawQuery = ""
 		u.Fragment = ""
 		return u.String() + partialUrl
+	} else {
+		if !strings.HasSuffix(baseUrl, "/") {
+			baseUrl = baseUrl + "/"
+		}
+		return baseUrl + partialUrl
 	}
-	return baseUrl + partialUrl
 }
 
 func TransportWithProxy(proxyUrl string) *http.Transport {

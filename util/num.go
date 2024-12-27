@@ -11,6 +11,15 @@ func String2Uint(s string) uint {
 	}
 }
 
+func String2Int(s string) int {
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		return 0
+	} else {
+		return i
+	}
+}
+
 func StringInSlice(a string, list []string) bool {
 	for _, b := range list {
 		if b == a {

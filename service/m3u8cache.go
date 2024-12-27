@@ -3,9 +3,9 @@ package service
 import (
 	"log"
 
-	"github.com/snowie2000/livetv/model"
-
 	"github.com/snowie2000/livetv/global"
+	"github.com/snowie2000/livetv/model"
+	"github.com/snowie2000/livetv/plugin"
 )
 
 var updateConcurrent = make(chan bool, 2) // allow up to 2 urls to be updated simultaneously
@@ -17,27 +17,44 @@ func LoadChannelCache() {
 		return
 	}
 	for _, v := range channels {
-		UpdateURLCacheSingle(v.URL, v.ProxyUrl, v.Parser, true)
+		UpdateURLCacheSingle(v, true)
+	}
+	InvalidateChannelCache()
+}
+
+func UpdateSubChannels(parentChannel *model.Channel, liveInfo *model.LiveInfo, Parser string, bUpdateStatus bool) {
+	// let's check if there are any sub channels
+	if p, err := plugin.GetPlugin(Parser); err == nil {
+		if provider, ok := p.(plugin.ChannalProvider); ok {
+			subchannels := provider.Channels(parentChannel, liveInfo)
+			for _, ch := range subchannels {
+				UpdateURLCacheSingle(ch, bUpdateStatus)
+			}
+		}
 	}
 }
 
-func UpdateURLCacheSingle(Url string, proxyUrl string, Parser string, bUpdateStatus bool) (*model.LiveInfo, error) {
+func UpdateURLCacheSingle(channel *model.Channel, bUpdateStatus bool) (*model.LiveInfo, error) {
 	updateConcurrent <- true
 	defer func() {
 		<-updateConcurrent
 	}()
-	log.Println("caching", Url)
-	liveInfo, err := RealLiveM3U8(Url, proxyUrl, Parser)
+	log.Println("caching", channel.URL)
+	liveInfo, err := RealLiveM3U8(channel.URL, channel.ProxyUrl, channel.Parser)
 	if err != nil {
-		global.URLCache.Delete(Url)
-		UpdateStatus(Url, Error, err.Error())
+		global.URLCache.Delete(channel.URL)
+		UpdateStatus(channel.URL, Error, err.Error())
 		log.Println("[LiveTV]", err)
 	} else {
-		global.URLCache.Store(Url, liveInfo)
+		// cache parsed result
+		global.URLCache.Store(channel.URL, liveInfo)
 		if bUpdateStatus {
-			UpdateStatus(Url, Ok, "Live!")
+			UpdateStatus(channel.URL, Ok, "Live!")
 		}
-		log.Println(Url, "cached")
+		log.Println(channel.URL, "cached")
+
+		UpdateSubChannels(channel, liveInfo, channel.Parser, bUpdateStatus)
+		InvalidateChannelCache(channel.ChannelID)
 	}
 	return liveInfo, err
 }
@@ -62,6 +79,7 @@ func UpdateURLCache() {
 		return true
 	})
 	for _, v := range channels {
-		UpdateURLCacheSingle(v.URL, v.ProxyUrl, v.Parser, true)
+		UpdateURLCacheSingle(v, true)
 	}
+	InvalidateChannelCache()
 }

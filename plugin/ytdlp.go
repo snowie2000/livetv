@@ -42,7 +42,15 @@ func (p *YtDlpParser) Parse(liveUrl string, proxyUrl string, lastInfo string) (*
 		cmd := exec.CommandContext(ctx, YtdlCmd, ytdlArgs...)
 		out, err := cmd.CombinedOutput()
 		output := strings.TrimSpace(string(out))
-		if err == nil {
+		lines := strings.Split(output, "\n")
+		cleanLines := []string(nil)
+		for _, l := range lines {
+			if strings.HasPrefix(l, "http") {
+				cleanLines = append(cleanLines, l)
+			}
+		}
+		output = strings.Join(cleanLines, "\n")
+		if err == nil || strings.HasSuffix(output, "m3u8") {
 			li := &model.LiveInfo{}
 			li.LiveUrl = output
 			return li, err
@@ -57,5 +65,5 @@ func (p *YtDlpParser) Parse(liveUrl string, proxyUrl string, lastInfo string) (*
 }
 
 func init() {
-	registerPlugin("yt-dlp", &YtDlpParser{})
+	registerPlugin("yt-dlp", &YtDlpParser{}, 7)
 }

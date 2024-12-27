@@ -94,5 +94,5 @@ func (p *RTMPParser) Parse(liveUrl string, proxyUrl string, previousExtraInfo st
 }
 
 func init() {
-	registerPlugin("rtmp", &RTMPParser{})
+	registerPlugin("rtmp", &RTMPParser{}, 3)
 }

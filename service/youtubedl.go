@@ -44,7 +44,7 @@ func GetLiveM3U8(youtubeURL string, proxyUrl string, Parser string) (*model.Live
 			coolDownInterval = time.Minute * 2
 		}
 		if time.Now().Sub(status.Time) > coolDownInterval {
-			if liveInfo, err := UpdateURLCacheSingle(youtubeURL, proxyUrl, Parser, true); err == nil {
+			if liveInfo, err := UpdateURLCacheSingle(&model.Channel{URL: youtubeURL, ProxyUrl: proxyUrl, Parser: Parser}, true); err == nil {
 				return liveInfo, nil
 			} else {
 				if status.CoolDownMultiplier < 1024 {
@@ -72,7 +72,7 @@ func GetM3U8Content(ChannelURL string, liveM3U8 string, ProxyUrl string, Parser 
 		if !retryFlag && chStatus.RetryCount < MaxRetryCount {
 			// this channel was previously running ok, we give it a chance to reparse itself
 			log.Println(ChannelURL, "is unhealthy, doing a reparse...")
-			if li, err := UpdateURLCacheSingle(ChannelURL, ProxyUrl, Parser, false); err == nil {
+			if li, err := UpdateURLCacheSingle(&model.Channel{URL: ChannelURL, ProxyUrl: ProxyUrl, Parser: Parser}, false); err == nil {
 				UpdateStatus(ChannelURL, Warning, "Unhealthy")
 				bodyString, newUrl, err = GetM3U8Content(ChannelURL, li.LiveUrl, ProxyUrl, Parser, true)
 				if err == nil {

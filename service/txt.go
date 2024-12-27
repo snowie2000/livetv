@@ -5,6 +5,8 @@ import (
 	"log"
 	"strings"
 
+	"github.com/snowie2000/livetv/model"
+
 	"github.com/snowie2000/livetv/global"
 )
 
@@ -48,21 +50,30 @@ func TXTGenerate() (string, error) {
 	}
 	genres := make(map[string]*genre)
 	var genreList []string
-	for _, v := range channels {
+	writeChannel := func(ch *model.Channel) {
 		category := "LiveTV"
-		if v.Category != "" {
-			category = v.Category
+		if ch.Category != "" {
+			category = ch.Category
 		}
 		if g, ok := genres[category]; ok {
-			g.addChannel(v.Name, fmt.Sprintf("%s/live.m3u8?token=%s&c=%d", baseUrl, v.Token, v.ID))
+			g.addChannel(ch.Name, fmt.Sprintf("%s/live.m3u8?token=%s&c=%s", baseUrl, ch.Token, ch.ChannelID))
 		} else {
 			g = &genre{
 				name:     category,
 				channels: make(map[string][]string),
 			}
 			genreList = append(genreList, category)
-			g.addChannel(v.Name, fmt.Sprintf("%s/live.m3u8?token=%s&c=%d", baseUrl, v.Token, v.ID))
+			g.addChannel(ch.Name, fmt.Sprintf("%s/live.m3u8?token=%s&c=%s", baseUrl, ch.Token, ch.ChannelID))
 			genres[category] = g
+		}
+	}
+	for _, v := range channels {
+		if len(v.Children) > 0 {
+			for _, sub := range v.Children {
+				writeChannel(sub)
+			}
+		} else {
+			writeChannel(v)
 		}
 	}
 	var txt strings.Builder

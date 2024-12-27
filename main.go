@@ -18,6 +18,7 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	_ "github.com/joho/godotenv/autoload"
+	"github.com/natefinch/lumberjack"
 	"github.com/robfig/cron/v3"
 	"github.com/snowie2000/livetv/global"
 	"github.com/snowie2000/livetv/route"
@@ -68,12 +69,15 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	log.Println("Server listen", binding)
 	log.Println("Server datadir", datadir)
-	logFile, err := os.OpenFile(datadir+"/livetv.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
-	if err != nil {
-		log.Panicln(err)
-	}
-	log.SetOutput(io.MultiWriter(os.Stderr, logFile))
-	err = global.InitDB(datadir + "/livetv.db")
+
+	log.SetOutput(io.MultiWriter(os.Stderr, &lumberjack.Logger{
+		Filename:   datadir + "/livetv.log",
+		MaxSize:    10, // megabytes
+		MaxBackups: 3,
+		MaxAge:     1,    //days
+		Compress:   true, // disabled by default
+	}))
+	err := global.InitDB(datadir + "/livetv.db")
 	if err != nil {
 		log.Panicf("init: %s\n", err)
 	}
@@ -121,5 +125,4 @@ func main() {
 		log.Panicf("Server forced to shutdown: %s\n", err)
 	}
 	log.Println("Server exiting")
-	logFile.Close()
 }
