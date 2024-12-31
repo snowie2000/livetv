@@ -18,36 +18,39 @@ var (
 )
 
 // load channel and its sub channels into cache, generate everything necessary
-func loadChannel(ch *model.Channel) {
+func loadChannel(ch *model.Channel, loadSubChannels bool) {
 	cache, ok := global.ChannelCache.Load(strconv.Itoa(ch.ID))
 	if ok {
 		*ch = cache
+		if !loadSubChannels {
+			return
+		}
 	} else {
 		ch.ChannelID = strconv.Itoa(ch.ID) // generate string ID for channel structs
 		ch.Token = generateToken(ch.ChannelID)
-		if ch.HasSubChannel {
-			// get child channels
-			if liveInfo, ok := global.URLCache.Load(ch.URL); ok {
-				if p, err := plugin.GetPlugin(ch.Parser); err == nil {
-					if provider, ok := p.(plugin.ChannalProvider); ok {
-						ch.Children = provider.Channels(ch, liveInfo)
-					}
-				}
-			}
-		}
-		if len(ch.Children) > 0 {
-			for _, sub := range ch.Children {
-				cache, ok := global.ChannelCache.Load(sub.ChannelID)
-				if ok {
-					sub.Token = cache.Token
-				} else {
-					sub.Token = generateToken(sub.ChannelID)
-					global.ChannelCache.Store(sub.ChannelID, *sub)
-				}
-			}
-		}
-		global.ChannelCache.Store(strconv.Itoa(ch.ID), *ch)
 	}
+	if ch.HasSubChannel {
+		// get child channels
+		if liveInfo, ok := global.URLCache.Load(ch.URL); ok {
+			if p, err := plugin.GetPlugin(ch.Parser); err == nil {
+				if provider, ok := p.(plugin.ChannalProvider); ok {
+					ch.Children = provider.Channels(ch, liveInfo)
+				}
+			}
+		}
+	}
+	if len(ch.Children) > 0 {
+		for _, sub := range ch.Children {
+			cache, ok := global.ChannelCache.Load(sub.ChannelID)
+			if ok {
+				sub.Token = cache.Token
+			} else {
+				sub.Token = generateToken(sub.ChannelID)
+				global.ChannelCache.Store(sub.ChannelID, *sub)
+			}
+		}
+	}
+	global.ChannelCache.Store(strconv.Itoa(ch.ID), *ch)
 }
 
 func GetAllChannel() (channels []*model.Channel, err error) {
@@ -55,7 +58,7 @@ func GetAllChannel() (channels []*model.Channel, err error) {
 	if err == nil {
 		// update all channel info to the cache
 		for _, ch := range channels {
-			loadChannel(ch)
+			loadChannel(ch, true)
 		}
 	}
 	return
@@ -107,7 +110,7 @@ func GetChannel(channelNumber int, subNumber int) (*model.Channel, error) {
 	var channel model.Channel
 	err := global.DB.Where("id = ?", channelNumber).First(&channel, channelNumber).Error
 	if err == nil {
-		loadChannel(&channel)
+		loadChannel(&channel, subNumber >= 0)
 	}
 	// now load from cache again
 	if ch, ok := global.ChannelCache.Load(chId); ok {
