@@ -1,10 +1,10 @@
-FROM golang:alpine AS builder
-RUN apk --no-cache add build-base
+FROM golang:bullseye AS builder
+RUN apt update && apt install build-essential -y
 WORKDIR /go/livetv_src
 COPY . . 
-RUN GO111MODULE=on go build -o livetv .
+RUN go build -o livetv .
 
-FROM alpine:latest
+FROM debian:bullseye-slim
 RUN apk --no-cache add ca-certificates libc6-compat libgcc libstdc++
 WORKDIR /opt
 COPY --from=builder /go/livetv_src/livetv .
