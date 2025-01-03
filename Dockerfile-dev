@@ -1,0 +1,13 @@
+FROM golang:alpine AS builder
+RUN apk --no-cache add build-base
+WORKDIR /go/livetv_src
+COPY . . 
+RUN GO111MODULE=on go build -o livetv .
+
+FROM alpine:latest
+RUN apk --no-cache add ca-certificates libc6-compat libgcc libstdc++
+WORKDIR /opt
+COPY --from=builder /go/livetv_src/livetv .
+EXPOSE 9000
+VOLUME ["/opt/data"]
+CMD ["./livetv"]
