@@ -3,8 +3,6 @@ package service
 import (
 	"bytes"
 	"fmt"
-	"net/url"
-	"path"
 	"strings"
 	"time"
 
@@ -39,21 +37,6 @@ func PlaceHolderHLS() string {
 	return fmt.Sprintf(tpl, placeholder, placeholder, placeholder)
 }
 
-func cleanUrl(Url string) string {
-	parsedURL, err := url.Parse(Url)
-	if err != nil {
-		return Url
-	}
-
-	// Resolve the path using path resolution
-	parsedURL.Path = path.Clean(parsedURL.Path) // Remove trailing segments
-
-	// Get the final clean URL as a string
-	cleanURL := parsedURL.String()
-
-	return cleanURL
-}
-
 func processMediaPlaylist(playlistUrl string, pl *m3u8.MediaPlaylist, prefixURL string, proxyToken string, proxy bool, channelNum int, fnTransform func(raw string, ts string) string) string {
 	baseUrl := global.GetBaseURL(playlistUrl)
 	handleUri := func(uri string) string {
@@ -61,7 +44,7 @@ func processMediaPlaylist(playlistUrl string, pl *m3u8.MediaPlaylist, prefixURL 
 			return uri
 		}
 		if !global.IsValidURL(uri) {
-			uri = cleanUrl(global.MergeUrl(baseUrl, uri))
+			uri = global.CleanUrl(global.MergeUrl(baseUrl, uri))
 		}
 		if proxy {
 			tsLink := global.MergeUrl(prefixURL, fmt.Sprintf("live.ts?token=%s&k=%s&c=%d", proxyToken, util.CompressString(uri), channelNum))
@@ -74,14 +57,14 @@ func processMediaPlaylist(playlistUrl string, pl *m3u8.MediaPlaylist, prefixURL 
 	}
 
 	var i uint = 0
-	if pl.Count() >= pl.WinSize() {
+	if pl.Count() >= pl.WinSize() && pl.WinSize() > 0 {
 		i = pl.Count() - pl.WinSize()
 	}
 	for ; i < pl.Count(); i++ {
 		pl.Segments[i].URI = handleUri(pl.Segments[i].URI)
 	}
 	// remove unused segments
-	for pl.Count() > pl.WinSize() {
+	for pl.Count() > pl.WinSize() && pl.WinSize() > 0 {
 		pl.Remove()
 	}
 	return pl.Encode().String()
@@ -94,7 +77,7 @@ func processMasterPlaylist(playlistUrl string, pl *m3u8.MasterPlaylist, prefixUR
 			return uri
 		}
 		if !global.IsValidURL(uri) {
-			uri = cleanUrl(global.MergeUrl(baseUrl, uri))
+			uri = global.CleanUrl(global.MergeUrl(baseUrl, uri))
 		}
 		if proxy {
 			plLink := global.MergeUrl(prefixURL, fmt.Sprintf("playlist.m3u8?token=%s&k=%s&c=%d", proxyToken, util.CompressString(uri), channelNum))

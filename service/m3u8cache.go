@@ -10,6 +10,14 @@ import (
 )
 
 var updateConcurrent = &greetrant.RecursiveMutex{}
+var parseCanceler func(chId int) = nil
+
+// cancel the parser if the channel or its sub channel is being parsed.
+func CancelChannelParser(chId int) {
+	if parseCanceler != nil {
+		parseCanceler(chId)
+	}
+}
 
 func LoadChannelCache() {
 	channels, err := GetAllChannel()
@@ -28,7 +36,23 @@ func UpdateSubChannels(parentChannel *model.Channel, liveInfo *model.LiveInfo, P
 	if p, err := plugin.GetPlugin(Parser); err == nil {
 		if provider, ok := p.(plugin.ChannalProvider); ok {
 			subchannels := provider.Channels(parentChannel, liveInfo)
+			canceled := false
+			if len(subchannels) > 0 {
+				// create a canceler
+				parseCanceler = func(chId int) {
+					if chId == parentChannel.ID {
+						canceled = true
+					}
+				}
+				defer func() {
+					parseCanceler = nil
+				}()
+			}
 			for _, ch := range subchannels {
+				if canceled {
+					log.Println("Channel has been removed")
+					break
+				}
 				UpdateURLCacheSingle(ch, bUpdateStatus)
 			}
 		}

@@ -47,7 +47,7 @@ func (p *RepeaterParser) Parse(liveUrl string, proxyUrl string, previousExtraInf
 		return nil, err
 	}
 
-	defer resp.Body.Close()
+	defer global.CloseBody(resp)
 	// the link itself is a valid M3U8
 	if strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "mpegurl") {
 		log.Println(liveUrl, "is a valid url")

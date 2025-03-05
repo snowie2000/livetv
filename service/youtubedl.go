@@ -1,7 +1,6 @@
 package service
 
 import (
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -58,6 +57,11 @@ func GetLiveM3U8(youtubeURL string, proxyUrl string, Parser string) (*model.Live
 	}
 }
 
+func isValidM3U(content string) bool {
+	content = strings.TrimSpace(string(content))
+	return strings.HasPrefix(content, "#EXTM3U")
+}
+
 // returns: content, updated m3u8url (if needed), error
 func GetM3U8Content(ChannelURL string, liveM3U8 string, ProxyUrl string, Parser string, flags ...bool) (string, string, error) {
 	// parse the optional flags
@@ -101,11 +105,8 @@ func GetM3U8Content(ChannelURL string, liveM3U8 string, ProxyUrl string, Parser 
 		}
 	}
 	client := http.Client{
-		Timeout: global.HttpClientTimeout,
-		Transport: &http.Transport{
-			Dial:            dialer.Dial,
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
+		Timeout:   global.HttpClientTimeout,
+		Transport: global.TransportWithProxy(""),
 	}
 	req, err := http.NewRequest(http.MethodGet, liveM3U8, nil)
 	if err != nil {
@@ -129,18 +130,27 @@ func GetM3U8Content(ChannelURL string, liveM3U8 string, ProxyUrl string, Parser 
 	}
 
 	bodyString := ""
-	defer resp.Body.Close()
+	defer global.CloseBody(resp)
 	// retry on server status error
 	if resp.StatusCode != http.StatusOK {
 		return retry(bodyString, errors.New(fmt.Sprintf("Server response: HTTP %d", resp.StatusCode)))
 	}
 
-	if resp.ContentLength < 10*1024*1024 && strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "mpegurl") {
+	// check if the response is in a correct mime-type and with correct content.
+	contentType := strings.ToLower(resp.Header.Get("Content-Type"))
+	isValid := resp.ContentLength < 10*1024*1024 && (strings.Contains(contentType, "mpegurl") || strings.Contains(contentType, "text"))
+	if isValid {
 		bodyBytes, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return "", liveM3U8, err
 		}
-		bodyString = string(bodyBytes)
+		bodyString = strings.TrimSpace(string(bodyBytes))
+		isValid = isValidM3U(bodyString)
+	}
+
+	// valid check passed.
+	if isValid {
+		// do custom health checks
 		// retry on custom health check error
 		if p, err := plugin.GetPlugin(Parser); err == nil {
 			if checker, ok := p.(plugin.HealthCheck); ok {

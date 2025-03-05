@@ -291,7 +291,7 @@ func NewChannelHandler(c *gin.Context) {
 		c.String(http.StatusBadRequest, "Incomplete channel info")
 		return
 	}
-	chProxy := c.PostForm("proxy") != ""
+	chProxy := c.PostForm("proxy") == "true"
 	mch := &model.Channel{
 		Name:          chName,
 		URL:           chURL,

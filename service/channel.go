@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/snowie2000/livetv/plugin"
 
@@ -65,7 +66,7 @@ func GetAllChannel() (channels []*model.Channel, err error) {
 }
 
 func SaveChannel(channel *model.Channel) error {
-	global.ChannelCache.Delete(channel.ChannelID)
+	DeleteChannel(channel.ID)
 	// clear children info before saving
 	children := channel.Children
 	channel.Children = []*model.Channel{}
@@ -75,7 +76,20 @@ func SaveChannel(channel *model.Channel) error {
 }
 
 func DeleteChannel(id int) error {
-	global.ChannelCache.Delete(strconv.Itoa(id))
+	var keys []string
+	CancelChannelParser(id) // cancel the parser
+	// iterate and delete the channel and all its subchannels
+	global.ChannelCache.Range(func(key string, value model.Channel) bool {
+		sid := strconv.Itoa(id)
+		if key == sid || strings.HasPrefix(key, sid+"-") {
+			keys = append(keys, key)
+			statusCache.Delete(value.URL)
+		}
+		return true
+	})
+	for _, key := range keys {
+		global.ChannelCache.Delete(key)
+	}
 	return global.DB.Delete(model.Channel{}, "id = ?", id).Error
 }
 

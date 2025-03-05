@@ -70,7 +70,7 @@ func (p *RTMPParser) Parse(liveUrl string, proxyUrl string, previousExtraInfo st
 		if err != nil {
 			return nil, err
 		}
-		defer resp.Body.Close()
+		defer global.CloseBody(resp)
 		var ui UrlInfo
 		decoder := json.NewDecoder(resp.Body)
 		if decoder.Decode(&ui) == nil && len(ui.Headers) > 0 {

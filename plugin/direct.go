@@ -18,7 +18,7 @@ func (p *DirectM3U8Parser) Transform(req *http.Request, info *model.LiveInfo) er
 	var ui UrlInfo
 	json.Unmarshal([]byte(info.ExtraInfo), &ui)
 	for v, k := range ui.Headers {
-		req.Header.Add(v, k)
+		req.Header.Set(v, k)
 	}
 	return nil
 }
@@ -66,7 +66,7 @@ func (p *DirectM3U8Parser) Parse(liveUrl string, proxyUrl string, previousExtraI
 		}
 
 		content = resp.Body
-		defer resp.Body.Close()
+		defer global.CloseBody(resp)
 	}
 
 	bestUrl, err := bestFromMasterPlaylist(liveUrl, proxyUrl, content) // extract the best quality live url from the master playlist

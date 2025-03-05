@@ -55,7 +55,7 @@ func (p *M3UParser) Parse(liveUrl string, proxyUrl string, previousExtraInfo str
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer global.CloseBody(resp)
 
 	if resp.ContentLength > 10*1024*1024 {
 		return nil, errors.New("playlist too large")

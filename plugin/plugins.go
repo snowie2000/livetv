@@ -139,7 +139,7 @@ func bestFromMasterPlaylist(masterUrl string, proxyUrl string, content ...io.Rea
 		if err != nil {
 			return "", err
 		}
-		defer resp.Body.Close()
+		defer global.CloseBody(resp)
 		if resp.ContentLength > 10*1024*1024 {
 			log.Println(masterUrl, "content too large")
 			return "", errors.New("Content too large")

@@ -37,7 +37,7 @@ func isLive(m3u8Url string, proxyUrl string) bool {
 		return false
 	}
 
-	defer resp.Body.Close()
+	defer global.CloseBody(resp)
 	if resp.ContentLength > 10*1024*1024 || !strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "mpegurl") {
 		return false
 	}
@@ -61,7 +61,7 @@ func parseUrl(liveUrl string, proxyUrl string) (*model.LiveInfo, error) {
 		return nil, err
 	}
 
-	defer resp.Body.Close()
+	defer global.CloseBody(resp)
 	// DO not parse invalid response, parse HTML only
 	if resp.ContentLength > 10*1024*1024 || !strings.Contains(resp.Header.Get("Content-Type"), "html") {
 		return nil, errors.New("invalid url")

@@ -276,7 +276,7 @@ func M3U8ProxyHandler(c *gin.Context) {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-	defer resp.Body.Close()
+	defer global.CloseBody(resp)
 	// deal with gzip
 	var reader io.ReadCloser
 	if resp.Header.Get("Content-Encoding") == "gzip" {
@@ -374,7 +374,7 @@ func TsProxyHandler(c *gin.Context) {
 			c.Writer.Header().Add(key, value)
 		}
 	}
-	defer resp.Body.Close()
+	defer global.CloseBody(resp)
 	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 	c.Writer.Header().Set("Access-Control-Allow-Methods", "*")
 	c.Writer.WriteHeader(resp.StatusCode)
