@@ -3,11 +3,13 @@ package service
 import (
 	"errors"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -63,7 +65,7 @@ func isValidM3U(content string) bool {
 }
 
 // returns: content, updated m3u8url (if needed), error
-func GetM3U8Content(ChannelURL string, liveM3U8 string, ProxyUrl string, Parser string, flags ...bool) (string, string, error) {
+func GetM3U8Content(c *gin.Context, ChannelURL string, liveM3U8 string, ProxyUrl string, Parser string, flags ...bool) (string, string, error) {
 	// parse the optional flags
 	retryFlag := false
 	if len(flags) > 0 {
@@ -78,12 +80,12 @@ func GetM3U8Content(ChannelURL string, liveM3U8 string, ProxyUrl string, Parser 
 			log.Println(ChannelURL, "is unhealthy, doing a reparse...")
 			if li, err := UpdateURLCacheSingle(&model.Channel{URL: ChannelURL, ProxyUrl: ProxyUrl, Parser: Parser}, false); err == nil {
 				UpdateStatus(ChannelURL, Warning, "Unhealthy")
-				bodyString, newUrl, err = GetM3U8Content(ChannelURL, li.LiveUrl, ProxyUrl, Parser, true)
+				bodyString, newUrl, err = GetM3U8Content(c, ChannelURL, li.LiveUrl, ProxyUrl, Parser, true)
 				if err == nil {
 					log.Println(ChannelURL, "is back online now")
 					UpdateStatus(ChannelURL, Ok, "Live!") // revert our temporary warning status to ok
 				} else {
-					log.Println(ChannelURL, "is still unhealthy, giving up, currently pointing to", liveM3U8)
+					log.Println(ChannelURL, "is still unhealthy, giving up, currently points to", liveM3U8)
 				}
 				// if error still persists after a reparse, keep our warning status so that we won't endlessly reparse the same feed
 			}
@@ -114,6 +116,17 @@ func GetM3U8Content(ChannelURL string, liveM3U8 string, ProxyUrl string, Parser 
 		return "", liveM3U8, err
 	}
 	req.Header.Set("User-Agent", DefaultUserAgent)
+	queries := c.Request.URL.Query()
+	reqQuery := req.URL.Query()
+	for key, values := range queries {
+		if strings.HasPrefix(key, "header") || slices.Contains([]string{"k", "c", "token"}, key) {
+			continue
+		}
+		for _, value := range values {
+			reqQuery.Add(key, value)
+		}
+	}
+	req.URL.RawQuery = reqQuery.Encode()
 
 	// allow plugins to decorate the m3u8 url
 	if p, err := plugin.GetPlugin(Parser); err == nil {

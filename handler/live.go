@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -191,7 +192,7 @@ func LiveHandler(c *gin.Context) {
 				finalUrl, bodyString, err = forger.ForgeM3U8(liveInfo)
 			} else {
 				// the GetM3U8Content will handle health-check, reparse, url decoration etc. and returns the final result and the final url used
-				bodyString, finalUrl, err = service.GetM3U8Content(channelInfo.URL, liveInfo.LiveUrl, channelInfo.ProxyUrl, channelInfo.Parser)
+				bodyString, finalUrl, err = service.GetM3U8Content(c, channelInfo.URL, liveInfo.LiveUrl, channelInfo.ProxyUrl, channelInfo.Parser)
 			}
 			if bodyString == "" {
 				log.Println(err)
@@ -265,11 +266,20 @@ func M3U8ProxyHandler(c *gin.Context) {
 	//req.Header.Set("Accept-Encoding", "gzip")
 	// added possible custom headers
 	queries := c.Request.URL.Query()
-	for key, value := range queries {
-		if strings.HasPrefix(key, "header") && len(value) > 0 {
-			req.Header.Set(key[6:], value[0])
+	reqQueries := req.URL.Query()
+	for key, values := range queries {
+		if strings.HasPrefix(key, "header") && len(values) > 0 {
+			req.Header.Set(key[6:], values[0])
+			continue
+		}
+		if slices.Contains([]string{"k", "c", "token"}, key) {
+			continue
+		}
+		for _, value := range values {
+			reqQueries.Add(key, value)
 		}
 	}
+	req.URL.RawQuery = reqQueries.Encode()
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Println(err)
