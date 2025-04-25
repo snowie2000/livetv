@@ -16,9 +16,7 @@ builds:
       - mipsle
       - mips64
       - mips64le
-      - riscv64
     goarm:
-      - "5"
       - "6"
       - "7"
     # Enable CGO if needed for this build
@@ -26,4 +24,22 @@ builds:
       - CGO_ENABLED=1
     ldflags:
       - -s -w -buildvcs=false
+    exclude:
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: arm64
+      
+archives:
+  - id: livetv_archive
+    builds:
+      - livetv 
+    format: binary # Output as a raw binary file, not a tar.gz or zip
+    # Define the name template for the output file
+    name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
+    # Set the output directory
+    format_overrides:
+      - goos: windows
+        format: zip # Use zip for Windows to include the .exe extension
+
 
