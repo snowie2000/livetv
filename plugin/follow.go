@@ -26,6 +26,7 @@ func (p *URLM3U8Parser) Parse(liveUrl string, proxyUrl string, previousExtraInfo
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
+		Jar: global.CookieJar,
 	}
 	req, err := http.NewRequest("GET", liveUrl, nil)
 	if err != nil {
@@ -56,11 +57,13 @@ func (p *URLM3U8Parser) Parse(liveUrl string, proxyUrl string, previousExtraInfo
 
 		var ui UrlInfo
 		decoder := json.NewDecoder(resp.Body)
-		if decoder.Decode(&ui) == nil && len(ui.Headers) > 0 {
-			ui.RedirectCounter = pei.RedirectCounter + 1
-			js, _ := json.Marshal(ui)
-			previousExtraInfo = string(js) // write headers info to extraInfo
+		if decoder.Decode(&ui) != nil {
+			ui = pei
 		}
+
+		ui.RedirectCounter = pei.RedirectCounter + 1
+		js, _ := json.Marshal(ui)
+		previousExtraInfo = string(js)                           // write headers info to extraInfo
 		info, err := p.Parse(redir, proxyUrl, previousExtraInfo) // recursive call the parser to follow redirections
 		if err == nil && info != nil {
 			info.Logo = ui.Logo

@@ -45,6 +45,7 @@ func (p *M3UParser) Parse(liveUrl string, proxyUrl string, previousExtraInfo str
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
+		Jar: global.CookieJar,
 	}
 	req, err := http.NewRequest("GET", liveUrl, nil)
 	if err != nil {

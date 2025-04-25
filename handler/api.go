@@ -107,18 +107,23 @@ func FetchHandler(c *gin.Context) {
 	default:
 		client.ImpersonateChrome()
 	}
-	if resp, err := client.R().Get(url); err != nil {
-		c.AbortWithError(http.StatusBadGateway, err)
-		return
-	} else {
-		for k, v := range resp.Header {
-			if len(v) > 0 {
-				c.Header(k, v[0])
-			}
-		}
-		c.Writer.WriteHeader(resp.StatusCode)
-		io.Copy(c.Writer, resp.Body)
+
+	req := client.R().SetBody(c.Request.Body)
+	headers := c.Request.Header
+	for key, value := range headers {
+		req.SetHeader(key, value[0])
 	}
+	req.RawURL = url
+	req.Method = c.Request.Method
+
+	resp := req.Do()
+	for k, v := range resp.Header {
+		if len(v) > 0 {
+			c.Header(k, v[0])
+		}
+	}
+	c.Writer.WriteHeader(resp.StatusCode)
+	io.Copy(c.Writer, resp.Body)
 }
 
 func CaptchaHandler(c *gin.Context) {

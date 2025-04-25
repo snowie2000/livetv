@@ -4,6 +4,7 @@ package diyp
 import (
 	"bufio"
 	"fmt"
+	"github.com/snowie2000/livetv/global"
 	"io"
 	"net/http"
 	"os"
@@ -131,6 +132,7 @@ func ParseChannel(path string) (*ChannelData, error) {
 	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
 		cli := http.Client{
 			Timeout: 10 * time.Second,
+			Jar:     global.CookieJar,
 		}
 		data, err := cli.Get(path)
 		if err != nil {

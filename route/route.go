@@ -32,6 +32,6 @@ func Register(r *gin.Engine) {
 	r.POST("/api/changepwd", handler.ChangePasswordHandler)
 	r.GET("/api/captcha", handler.CaptchaHandler)
 	r.GET("/", handler.IndexHandler)
-	r.GET("/fetch", handler.FetchHandler)
+	r.Any("/fetch", handler.FetchHandler)
 	r.GET("/:path", handler.IndexHandler)
 }

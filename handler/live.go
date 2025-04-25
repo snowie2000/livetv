@@ -260,6 +260,7 @@ func M3U8ProxyHandler(c *gin.Context) {
 	client := http.Client{
 		Timeout:   global.HttpClientTimeout,
 		Transport: global.TransportWithProxy(channelInfo.ProxyUrl),
+		Jar:       global.CookieJar,
 	}
 	req, _ := http.NewRequest(http.MethodGet, remoteURL, nil)
 	req.Header.Set("User-Agent", plugin.DefaultUserAgent)
@@ -351,6 +352,7 @@ func TsProxyHandler(c *gin.Context) {
 	client := http.Client{
 		Timeout:   global.HttpClientTimeout,
 		Transport: global.TransportWithProxy(channelInfo.ProxyUrl),
+		Jar:       global.CookieJar,
 	}
 	req := c.Request.Clone(context.Background())
 	req.RequestURI = ""

@@ -1,6 +1,7 @@
 package global
 
 import (
+	"net/http/cookiejar"
 	"time"
 
 	"github.com/snowie2000/livetv/model"
@@ -19,6 +20,7 @@ var defaultConfigValue = map[string]string{
 
 var (
 	HttpClientTimeout = 10 * time.Second
+	CookieJar, _      = cookiejar.New(nil)
 	ConfigCache       syncx.Map[string, string]
 	URLCache          syncx.Map[string, *model.LiveInfo]
 	ChannelCache      syncx.Map[string, model.Channel]

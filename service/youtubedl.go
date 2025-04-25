@@ -109,6 +109,7 @@ func GetM3U8Content(c *gin.Context, ChannelURL string, liveM3U8 string, ProxyUrl
 	client := http.Client{
 		Timeout:   global.HttpClientTimeout,
 		Transport: global.TransportWithProxy(""),
+		Jar:       global.CookieJar,
 	}
 	req, err := http.NewRequest(http.MethodGet, liveM3U8, nil)
 	if err != nil {

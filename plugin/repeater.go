@@ -36,6 +36,7 @@ func (p *RepeaterParser) Parse(liveUrl string, proxyUrl string, previousExtraInf
 	client := http.Client{
 		Timeout:   time.Second * 10,
 		Transport: global.TransportWithProxy(proxyUrl),
+		Jar:       global.CookieJar,
 	}
 	req, err := http.NewRequest("GET", liveUrl, nil)
 	if err != nil {

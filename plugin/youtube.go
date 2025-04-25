@@ -26,6 +26,7 @@ func isLive(m3u8Url string, proxyUrl string) bool {
 	client := http.Client{
 		Timeout:   time.Second * 10,
 		Transport: global.TransportWithProxy(proxyUrl),
+		Jar:       global.CookieJar,
 	}
 	req, err := http.NewRequest("GET", m3u8Url, nil)
 	if err != nil {
@@ -50,6 +51,7 @@ func parseUrl(liveUrl string, proxyUrl string) (*model.LiveInfo, error) {
 	client := http.Client{
 		Timeout:   time.Second * 10,
 		Transport: global.TransportWithProxy(proxyUrl),
+		Jar:       global.CookieJar,
 	}
 	req, err := http.NewRequest("GET", liveUrl, nil)
 	if err != nil {
