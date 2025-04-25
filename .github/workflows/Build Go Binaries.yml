@@ -41,17 +41,6 @@ jobs:
     steps:
       - name: Checkout Source
         uses: actions/checkout@v3
-
-      - name: Set up Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.24'
-
-      - name: Install UPX
-        uses: crazy-max/ghaction-upx@v3
-        with:
-          version: 'v4.2.4'
-          install-only: true
           
       - name: Build Binary with Cross-Compilation Container
         uses: docker://ghcr.io/goreleaser/goreleaser:latest # Or another suitable cross-compilation image
@@ -80,7 +69,7 @@ jobs:
             # The Docker image should have the necessary cross-toolchains and libraries pre-configured
             # You might need to adjust CGO_CFLAGS and CGO_LDFLAGS depending on the image
             GOOS=$GOOS GOARCH=$GOARCH GOARM=$GOARM CGO_ENABLED=$CGO_ENABLED \
-            go build -ldflags=\"-s -w\" -o build/$OUTPUT_FILE
+            go build -buildvcs=false -ldflags=\"-s -w\" -o build/$OUTPUT_FILE
             "
 
       - name: Upload to GitHub Release
