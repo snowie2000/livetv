@@ -1,5 +1,4 @@
 name: Build Go Binaries
-
 on:
   workflow_dispatch:
     inputs:
@@ -7,7 +6,6 @@ on:
         description: 'Release Tag (e.g., 0.1.0)'
         required: true
         default: '1.'
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,68 +13,37 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # No need to list individual architectures here, GoReleaser handles it
+        # You can still use a matrix for other job-level settings if needed
         include:
-          - arch: amd64
-          - arch: 386
-            filename: i386
-          - arch: arm
-            goarm: 5
-          - arch: arm
-            goarm: 6
-          - arch: arm
-            goarm: 7
-          - arch: arm64
-          - arch: mips
-          - arch: mipsle
-          - arch: mips64
-          - arch: mips64le
-          - arch: riscv64
-          - arch: amd64
-            goos: windows
-          - arch: 386
-            goos: windows
-
-    name: Build for ${{ matrix.goos || 'linux' }}-${{ matrix.arch }}${{ matrix.goarm && format(' (GOARM={0})', matrix.goarm) || '' }}
-
+          - job_name: goreleaser_build # Just a descriptive name for the job matrix
+    name: ${{ matrix.job_name }}
     steps:
       - name: Checkout Source
         uses: actions/checkout@v3
-          
-      - name: Build Binary with Cross-Compilation Container
-        uses: docker://ghcr.io/goreleaser/goreleaser:latest # Or another suitable cross-compilation image
         with:
-          entrypoint: /bin/bash
-          args: |
-            -c "
-            set -euo pipefail
-            mkdir -p build
-            GOOS=${{ matrix.goos || 'linux' }}
-            GOARCH=${{ matrix.arch }}
-            GOARM=${{ matrix.goarm || '' }}
-            CGO_ENABLED=1 # Enable CGO for all builds within the container
-            if [[ \"$GOARCH\" == \"386\" && \"$GOOS\" == \"windows\" ]]; then
-              OUTPUT_FILE=\"livetv-windows-i386.exe\"
-            elif [[ \"$GOARCH\" == \"amd64\" && \"$GOOS\" == \"windows\" ]]; then
-              OUTPUT_FILE=\"livetv-windows-amd64.exe\"
-            elif [[ \"$GOARCH\" == \"386\" ]]; then
-              OUTPUT_FILE=\"livetv-linux-i386\"
-            elif [[ \"$GOARCH\" == \"arm\" ]]; then
-              OUTPUT_FILE=\"livetv-linux-armv${GOARM}\"
-            else
-              OUTPUT_FILE=\"livetv-linux-${GOARCH}\"
-            fi
-            echo \"Building for $GOOS/$GOARCH with GOARM=$GOARM and CGO_ENABLED=$CGO_ENABLED\"
-            # The Docker image should have the necessary cross-toolchains and libraries pre-configured
-            # You might need to adjust CGO_CFLAGS and CGO_LDFLAGS depending on the image
-            GOOS=$GOOS GOARCH=$GOARCH GOARM=$GOARM CGO_ENABLED=$CGO_ENABLED \
-            go build -buildvcs=false -ldflags=\"-s -w\" -o build/$OUTPUT_FILE
-            "
+          fetch-depth: 0 # Needed by GoReleaser for git information
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24'
+          # cache: true # Uncomment to enable Go module caching
+      # Use the GoReleaser Action for building
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v5
+        with:
+          distribution: goreleaser # Use the standard goreleaser distribution
+          version: latest # Or a specific version like 'v1.24.0'
+          args: build --clean --snapshot # Use the 'build' command
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed for some GoReleaser features, optional for just build
+
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag }}
-          files: build/*
+          files: dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -1,0 +1,29 @@
+# .goreleaser.yaml
+builds:
+  - id: livetv
+    # Path to your main package (where your main() function is)
+    main: ./ # Adjust this path based on your project structure
+    binary: livetv
+    goos:
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - 386
+      - arm
+      - arm64
+      - mips
+      - mipsle
+      - mips64
+      - mips64le
+      - riscv64
+    goarm:
+      - "5"
+      - "6"
+      - "7"
+    # Enable CGO if needed for this build
+    env:
+      - CGO_ENABLED=1
+    ldflags:
+      - -s -w -buildvcs=false
+
