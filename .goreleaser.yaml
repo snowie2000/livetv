@@ -24,7 +24,7 @@ builds:
       - CGO_ENABLED=1
     ldflags:
       - -s -w -buildvcs=false
-    exclude:
+    ignore:
       - goos: windows
         goarch: arm
       - goos: windows
