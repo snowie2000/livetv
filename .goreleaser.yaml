@@ -10,20 +10,11 @@ builds:
     goarch:
       - amd64
       - 386
-      - mips
-      - mipsle
-      - mips64
-      - mips64le
     # Enable CGO if needed for this build
     env:
       - CGO_ENABLED=1
     ldflags:
       - -s -w -buildvcs=false
-    ignore:
-      - goos: windows
-        goarch: arm
-      - goos: windows
-        goarch: arm64
       
 archives:
   - id: livetv_archive
