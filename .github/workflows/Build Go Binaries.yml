@@ -73,7 +73,7 @@ jobs:
           fi
 
           export GOARM=${{ matrix.goarm || '' }}
-          export CGO_ENABLED=0
+          export CGO_ENABLED=1
           GOOS=$GOOS GOARCH=$GOARCH GOARM=$GOARM \
           go build -ldflags="-s -w" -o build/$OUTPUT_FILE
 
