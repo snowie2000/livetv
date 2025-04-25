@@ -28,7 +28,6 @@ jobs:
       - name: Run GoReleaser in Cross-Compilation Container
         uses: docker://goreleaser/goreleaser:latest # Or a specific version and image
         with:
-          entrypoint: /usr/local/bin/goreleaser # The entrypoint to run goreleaser within the container
           args: build --clean --snapshot # Or 'release' for actual releases
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed by GoReleaser
