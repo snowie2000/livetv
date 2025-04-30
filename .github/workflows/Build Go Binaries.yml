@@ -26,10 +26,6 @@ jobs:
           - arch: arm
             goarm: 7
           - arch: arm64
-          - arch: mips
-          - arch: mipsle
-          - arch: mips64
-          - arch: mips64le
           - arch: riscv64
           - arch: amd64
             goos: windows
