@@ -1,11 +1,13 @@
 name: Build Go Binaries
+
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release Tag (e.g., 0.1.0)'
+        description: 'Release Tag (e.g., 1.0)'
         required: true
         default: '1.'
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -13,30 +15,73 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # No need to list individual architectures here, GoReleaser handles it
-        # You can still use a matrix for other job-level settings if needed
         include:
-          - job_name: goreleaser_build # Just a descriptive name for the job matrix
-    name: ${{ matrix.job_name }}
+          - arch: amd64
+          - arch: 386
+            filename: i386
+          - arch: arm
+            goarm: 5
+          - arch: arm
+            goarm: 6
+          - arch: arm
+            goarm: 7
+          - arch: arm64
+          - arch: mips
+          - arch: mipsle
+          - arch: mips64
+          - arch: mips64le
+          - arch: riscv64
+          - arch: amd64
+            goos: windows
+          - arch: 386
+            goos: windows
+
+    name: Build for ${{ matrix.goos || 'linux' }}-${{ matrix.arch }}${{ matrix.goarm && format(' (GOARM={0})', matrix.goarm) || '' }}
+
     steps:
       - name: Checkout Source
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0 # Needed by GoReleaser for git information
 
-      # Use a Docker container specifically designed for cross-compilation
-      - name: Run GoReleaser in Cross-Compilation Container
-        uses: docker://goreleaser/goreleaser:latest # Or a specific version and image
+      - name: Set up Go
+        uses: actions/setup-go@v4
         with:
-          args: build --clean --snapshot # Or 'release' for actual releases
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Needed by GoReleaser
+          go-version: '1.24'
+
+      - name: Build Binary
+        run: |
+          mkdir -p build
+
+          GOOS=${{ matrix.goos || 'linux' }}
+          GOARCH=${{ matrix.arch }}
+
+          if [[ "$GOARCH" == "386" && "$GOOS" == "windows" ]]; then
+            OUTPUT_FILE="livetv-windows-i386.exe"
+          elif [[ "$GOARCH" == "amd64" && "$GOOS" == "windows" ]]; then
+            OUTPUT_FILE="livetv-windows-amd64.exe"
+          elif [[ "$GOARCH" == "386" ]]; then
+            OUTPUT_FILE="livetv-linux-i386"
+          elif [[ "$GOARCH" == "arm" ]]; then
+            OUTPUT_FILE="livetv-linux-armv${{ matrix.goarm }}"
+          else
+            OUTPUT_FILE="livetv-linux-${GOARCH}"
+          fi
+
+          export GOARM=${{ matrix.goarm || '' }}
+          export CGO_ENABLED=0
+          GOOS=$GOOS GOARCH=$GOARCH GOARM=$GOARM \
+          go build -ldflags="-s -w" -o build/$OUTPUT_FILE main.go
+
+          # if [[ "$GOARCH" != "mips64" && "$GOARCH" != "mips64le" && "$GOARCH" != "riscv64" ]]; then
+          #   upx --best build/$OUTPUT_FILE
+          # else
+          #   echo "Skipping UPX compression for $OUTPUT_FILE (not supported)"
+          # fi
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag }}
-          files: dist/*
+          files: build/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

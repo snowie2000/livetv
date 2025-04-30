@@ -121,7 +121,6 @@ func CloseBody(resp any) {
 			// if the body is already read in some scenarios, the below operation becomes a no-op
 			_, _ = io.Copy(io.Discard, resp.Body)
 			_ = resp.Body.Close()
-			fmt.Println("http response closed")
 		}
 	}
 	if resp, ok := resp.(*freq.Response); ok {
