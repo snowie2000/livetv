@@ -22,7 +22,7 @@ type RTMPParser struct {
 	URLM3U8Parser
 }
 
-func (p *RTMPParser) Host(c *gin.Context, info *model.LiveInfo) error {
+func (p *RTMPParser) Host(c *gin.Context, info *model.LiveInfo, chInfo *model.Channel) error {
 	rtmpConn, conn, err := rtmp.NewClient().Dial(info.LiveUrl, rtmp.PrepareReading)
 	if err != nil {
 		return err

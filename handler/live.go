@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"slices"
@@ -173,7 +174,7 @@ func LiveHandler(c *gin.Context) {
 			if err == nil {
 				if handler, ok := parser.(plugin.FeedHost); ok {
 					// handler has the ability host the feed and succeeded
-					if handler.Host(c, liveInfo) == nil {
+					if handler.Host(c, liveInfo, channelInfo) == nil {
 						return
 					}
 				}
@@ -391,6 +392,44 @@ func TsProxyHandler(c *gin.Context) {
 	c.Writer.Header().Set("Access-Control-Allow-Methods", "*")
 	c.Writer.WriteHeader(resp.StatusCode)
 	io.Copy(c.Writer, resp.Body)
+}
+
+func ReverseProxyHandler(c *gin.Context) {
+	// verify access token if protection is enabled (by default)
+	disableProtection := os.Getenv("LIVETV_FREEACCESS") == "1"
+	if !disableProtection {
+		token := c.Query("token")
+		if token != global.GetLiveToken() {
+			c.String(http.StatusForbidden, "Forbidden")
+			return
+		}
+	}
+
+	zippedRemoteURL := c.Query("k")
+	remoteURL, err := util.DecompressString(zippedRemoteURL)
+	if err != nil {
+		log.Println(err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	u, err := url.Parse(remoteURL)
+	log.Println(u)
+	if err != nil {
+		log.Println(err)
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	proxyUrl := c.Query("proxy")
+	// use reverseProxy to proxy the request
+	server := httputil.NewSingleHostReverseProxy(u)
+	if proxyUrl != "" {
+		server.Transport = global.TransportWithProxy(proxyUrl)
+	}
+	server.Director = func(req *http.Request) {
+		req.URL = u
+		req.Host = u.Host
+	}
+	server.ServeHTTP(c.Writer, c.Request)
 }
 
 func CacheHandler(c *gin.Context) {

@@ -44,7 +44,7 @@ type HealthCheck interface {
 
 // host a live feed directly instead of generating a m3u8 playlist
 type FeedHost interface {
-	Host(c *gin.Context, info *model.LiveInfo) error
+	Host(c *gin.Context, info *model.LiveInfo, chInfo *model.Channel) error
 }
 
 // Allow a plugin to generate a custom M3U8 playlist instead of requesting from the internet

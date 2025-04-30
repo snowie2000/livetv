@@ -16,7 +16,7 @@ import (
 
 type RepeaterParser struct{}
 
-func (p *RepeaterParser) Host(c *gin.Context, info *model.LiveInfo) error {
+func (p *RepeaterParser) Host(c *gin.Context, info *model.LiveInfo, chInfo *model.Channel) error {
 	c.Redirect(http.StatusFound, info.LiveUrl)
 	return nil
 }
