@@ -413,7 +413,6 @@ func ReverseProxyHandler(c *gin.Context) {
 		return
 	}
 	u, err := url.Parse(remoteURL)
-	log.Println(u)
 	if err != nil {
 		log.Println(err)
 		c.AbortWithStatus(http.StatusInternalServerError)

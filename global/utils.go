@@ -82,6 +82,19 @@ func removeDocumentPart(rawURL string) (string, error) {
 	return baseUrl, nil
 }
 
+func simpleJoin(base string, elem ...string) string {
+	for _, ele := range elem {
+		if !strings.HasSuffix(base, "/") {
+			base = base + "/"
+		}
+		if strings.HasPrefix(ele, "/") {
+			ele = ele[1:]
+		}
+		base = base + ele
+	}
+	return base
+}
+
 func MergeUrl(baseUrl string, partialUrl string) string {
 	if baseUrl == "" {
 		return partialUrl
@@ -92,10 +105,10 @@ func MergeUrl(baseUrl string, partialUrl string) string {
 		u.Path = ""
 		u.RawQuery = ""
 		u.Fragment = ""
-		return u.String() + partialUrl
+		return simpleJoin(u.String(), partialUrl)
 	} else {
 		baseUrl, _ = removeDocumentPart(baseUrl)
-		return baseUrl + partialUrl
+		return simpleJoin(baseUrl, partialUrl)
 	}
 }
 

@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"slices"
 	"strings"
 	"time"
 
@@ -117,6 +116,7 @@ func GetM3U8Content(c *gin.Context, ChannelURL string, liveM3U8 string, ProxyUrl
 		return "", liveM3U8, err
 	}
 	req.Header.Set("User-Agent", DefaultUserAgent)
+	/* remove parameter passthrough as it may conflict with some servers
 	queries := c.Request.URL.Query()
 	reqQuery := req.URL.Query()
 	for key, values := range queries {
@@ -128,6 +128,7 @@ func GetM3U8Content(c *gin.Context, ChannelURL string, liveM3U8 string, ProxyUrl
 		}
 	}
 	req.URL.RawQuery = reqQuery.Encode()
+	*/
 
 	// allow plugins to decorate the m3u8 url
 	if p, err := plugin.GetPlugin(Parser); err == nil {
@@ -147,6 +148,8 @@ func GetM3U8Content(c *gin.Context, ChannelURL string, liveM3U8 string, ProxyUrl
 	defer global.CloseBody(resp)
 	// retry on server status error
 	if resp.StatusCode != http.StatusOK {
+		//body, _ := io.ReadAll(resp.Body)
+		//log.Println("visiting", liveM3U8, req.URL, "error:", string(body))
 		return retry(bodyString, errors.New(fmt.Sprintf("Server response: HTTP %d", resp.StatusCode)))
 	}
 
