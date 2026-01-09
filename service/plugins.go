@@ -1,5 +1,5 @@
 // plugins
-package plugin
+package service
 
 import (
 	"context"
@@ -16,7 +16,6 @@ import (
 	httpproxy "github.com/fopina/net-proxy-httpconnect/proxy"
 	freq "github.com/imroc/req/v3"
 
-	"github.com/dlclark/regexp2"
 	"github.com/snowie2000/livetv/global"
 	"github.com/snowie2000/livetv/model"
 
@@ -25,7 +24,7 @@ import (
 
 // plugin parser interface
 type Plugin interface {
-	Parse(liveUrl string, proxyUrl string, previousExtraInfo string) (info *model.LiveInfo, error error)
+	Parse(channel *model.Channel, prevLiveInfo *model.LiveInfo) (info *model.LiveInfo, error error)
 }
 
 type ChannalProvider interface {
@@ -57,6 +56,11 @@ type TsTransformer interface {
 	TransformTs(rawLink string, tsLink string, info *model.LiveInfo) string
 }
 
+// custom channel url parser to parse sub channel freely
+type ChannelParser interface {
+	ParseChannelUrl(chUrl string, mainChannelInfo *model.Channel) *model.Channel
+}
+
 type UrlInfo struct {
 	Headers         map[string]string `json:"headers"`
 	Logo            string            `json:"logo"`
@@ -72,17 +76,18 @@ var (
 	pluginCenter  map[string]pluginInfo = make(map[string]pluginInfo)
 	NoMatchPlugin error                 = errors.New("No matching plugin found")
 	NoMatchFeed   error                 = errors.New("This channel is not currently live")
+	RetryOutdated error                 = errors.New("Channel data is outdated")
 )
 
 const (
-	DefaultUserAgent string = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+	DefaultUserAgent string = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 )
 
-func registerPlugin(name string, parser Plugin, priority int) {
+func RegisterPlugin(name string, parser Plugin, priority int) {
 	pluginCenter[name] = pluginInfo{parser, priority}
 }
 
-func cloudScraper(req *http.Request, proxyUrl string) (*freq.Response, error) {
+func CloudScraper(req *http.Request, proxyUrl string) (*freq.Response, error) {
 	client := freq.C().ImpersonateFirefox() //.SetCommonContentType("application/x-www-form-urlencoded; charset=UTF-8").SetCommonHeader("accept", "*/*")
 	if proxyUrl != "" {
 		client.SetDial(func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -126,7 +131,7 @@ func cloudScraper(req *http.Request, proxyUrl string) (*freq.Response, error) {
 	// return client.Do(req)
 }
 
-func bestFromMasterPlaylist(masterUrl string, proxyUrl string, content ...io.Reader) (string, error) {
+func BestFromMasterPlaylist(masterUrl string, proxyUrl string, content ...io.Reader) (string, error) {
 	var playlist io.Reader
 	if len(content) > 0 {
 		playlist = content[0]
@@ -135,7 +140,7 @@ func bestFromMasterPlaylist(masterUrl string, proxyUrl string, content ...io.Rea
 		if err != nil {
 			return "", err
 		}
-		resp, err := cloudScraper(req, proxyUrl)
+		resp, err := CloudScraper(req, proxyUrl)
 		if err != nil {
 			return "", err
 		}
@@ -183,25 +188,6 @@ func bestFromMasterPlaylist(masterUrl string, proxyUrl string, content ...io.Rea
 		}
 	}
 	return "", errors.New("Unknown type of playlist")
-}
-
-// regex from https://stackoverflow.com/questions/5830387/how-do-i-find-all-youtube-video-ids-in-a-string-using-a-regex?lq=1
-func getYouTubeVideoID(url string) string {
-	regex := regexp2.MustCompile(`(?:youtu\.be\/|youtube(?:-nocookie)?\.com\S*?[^\w\s-])([\w-]{11})(?=[^\w-]|$)(?![?=&+%\w.-]*(?:['"][^<>]*>|<\/a>))[?=&+%\w.-]*`, 0)
-	match, _ := regex.FindStringMatch(url)
-	if match != nil && len(match.Groups()) > 0 {
-		return match.Groups()[0].Captures[0].String()
-	}
-	return ""
-}
-
-func getYouTubeChannelID(url string) string {
-	regex := regexp2.MustCompile(`youtu((\.be)|(be\..{2,5}))\/((user)|(channel)|(c)|(@))\/?([a-zA-Z0-9\-_]{1,})`, 0)
-	match, _ := regex.FindStringMatch(url)
-	if match != nil && len(match.Groups()) > 0 {
-		return match.Groups()[9].Captures[0].String()
-	}
-	return ""
 }
 
 func GetPlugin(name string) (Plugin, error) {

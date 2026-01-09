@@ -19,11 +19,11 @@ import (
 	"github.com/nareix/joy5/format/rtmp"
 )
 
-type RTMPParser struct {
+type TranscodeParser struct {
 	URLM3U8Parser
 }
 
-func (p *RTMPParser) Host(c *gin.Context, info *model.LiveInfo, chInfo *model.Channel) error {
+func (p *TranscodeParser) Host(c *gin.Context, info *model.LiveInfo, chInfo *model.Channel) error {
 	rtmpConn, conn, err := rtmp.NewClient().Dial(info.LiveUrl, rtmp.PrepareReading)
 	if err != nil {
 		return err
@@ -52,7 +52,7 @@ func (p *RTMPParser) Host(c *gin.Context, info *model.LiveInfo, chInfo *model.Ch
 	return nil
 }
 
-func (p *RTMPParser) Parse(channel *model.Channel, prevLiveInfo *model.LiveInfo) (*model.LiveInfo, error) {
+func (p *TranscodeParser) Parse(channel *model.Channel, prevLiveInfo *model.LiveInfo) (*model.LiveInfo, error) {
 	previousExtraInfo := prevLiveInfo.ExtraInfo
 	u, err := url.Parse(channel.URL)
 	if err != nil || !strings.EqualFold(u.Scheme, "rtmp") {
@@ -97,5 +97,5 @@ func (p *RTMPParser) Parse(channel *model.Channel, prevLiveInfo *model.LiveInfo)
 }
 
 func init() {
-	service.RegisterPlugin("rtmp", &RTMPParser{}, 3)
+	service.RegisterPlugin("transcode", &TranscodeParser{}, 3)
 }

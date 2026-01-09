@@ -21,6 +21,7 @@ import (
 	"github.com/natefinch/lumberjack"
 	"github.com/robfig/cron/v3"
 	"github.com/snowie2000/livetv/global"
+	_ "github.com/snowie2000/livetv/plugin"
 	"github.com/snowie2000/livetv/route"
 	"github.com/snowie2000/livetv/service"
 )

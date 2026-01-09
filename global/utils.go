@@ -12,6 +12,7 @@ import (
 	"path"
 	"strings"
 	"time"
+	"unicode"
 
 	freq "github.com/imroc/req/v3"
 	"golang.org/x/net/proxy"
@@ -51,6 +52,15 @@ func IsValidURL(u string) bool {
 		return err == nil && uu.Scheme != "" && uu.Host != ""
 	}
 	return false
+}
+
+func CleanString(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsPrint(r) {
+			return r
+		}
+		return -1
+	}, strings.TrimSpace(s))
 }
 
 func removeDocumentPart(rawURL string) (string, error) {

@@ -14,6 +14,7 @@ type Channel struct {
 	Message    string
 	Category   string
 	Virtual    bool
+	Extra      string
 	Children   []Channel `json:"children"`
 }
 

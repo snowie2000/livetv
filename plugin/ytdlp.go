@@ -4,6 +4,7 @@ package plugin
 import (
 	"context"
 	"errors"
+	"github.com/snowie2000/livetv/service"
 	"log"
 	"os/exec"
 	"strings"
@@ -15,7 +16,7 @@ import (
 
 type YtDlpParser struct{}
 
-func (p *YtDlpParser) Parse(liveUrl string, proxyUrl string, lastInfo string) (*model.LiveInfo, error) {
+func (p *YtDlpParser) Parse(channel *model.Channel, prevLiveInfo *model.LiveInfo) (*model.LiveInfo, error) {
 	YtdlCmd, err := global.GetConfig("ytdl_cmd")
 	if err != nil {
 		log.Println(err)
@@ -29,7 +30,7 @@ func (p *YtDlpParser) Parse(liveUrl string, proxyUrl string, lastInfo string) (*
 	ytdlArgs := strings.Fields(YtdlArgs)
 	for i, v := range ytdlArgs {
 		if strings.EqualFold(v, "{url}") {
-			ytdlArgs[i] = liveUrl
+			ytdlArgs[i] = channel.URL
 		}
 	}
 	_, err = exec.LookPath(YtdlCmd)
@@ -65,5 +66,5 @@ func (p *YtDlpParser) Parse(liveUrl string, proxyUrl string, lastInfo string) (*
 }
 
 func init() {
-	registerPlugin("yt-dlp", &YtDlpParser{}, 7)
+	service.RegisterPlugin("yt-dlp", &YtDlpParser{}, 7)
 }

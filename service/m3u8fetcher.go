@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -18,7 +18,6 @@ import (
 
 	"github.com/snowie2000/livetv/global"
 	"github.com/snowie2000/livetv/model"
-	"github.com/snowie2000/livetv/plugin"
 )
 
 // A Dialer is a means to establish a connection.
@@ -30,21 +29,19 @@ type Dialer interface {
 
 var errNoMatchFound error = errors.New("This channel is not currently live")
 
-const DefaultUserAgent string = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-
-func GetLiveM3U8(youtubeURL string, proxyUrl string, Parser string) (*model.LiveInfo, error) {
-	liveInfo, ok := global.URLCache.Load(youtubeURL)
+func GetLiveM3U8(channel *model.Channel) (*model.LiveInfo, error) {
+	liveInfo, ok := global.URLCache.Load(channel.URL)
 	if ok {
 		return liveInfo, nil
 	} else {
-		log.Println("cache miss", youtubeURL)
-		status := GetStatus(youtubeURL)
+		log.Println("cache miss", channel.URL)
+		status := GetStatus(channel.URL)
 		coolDownInterval := time.Second * time.Duration(status.CoolDownMultiplier)
 		if coolDownInterval > time.Minute*2 {
 			coolDownInterval = time.Minute * 2
 		}
 		if time.Now().Sub(status.Time) > coolDownInterval {
-			if liveInfo, err := UpdateURLCacheSingle(&model.Channel{URL: youtubeURL, ProxyUrl: proxyUrl, Parser: Parser}, true); err == nil {
+			if liveInfo, err := UpdateURLCacheSingle(channel, true); err == nil {
 				return liveInfo, nil
 			} else {
 				if status.CoolDownMultiplier < 1024 {
@@ -64,7 +61,8 @@ func isValidM3U(content string) bool {
 }
 
 // returns: content, updated m3u8url (if needed), error
-func GetM3U8Content(c *gin.Context, ChannelURL string, liveM3U8 string, ProxyUrl string, Parser string, flags ...bool) (string, string, error) {
+// func GetM3U8Content(c *gin.Context, ChannelURL string, liveM3U8 string, ProxyUrl string, Parser string, flags ...bool) (string, string, error) {
+func GetM3U8Content(c *gin.Context, Channel *model.Channel, liveInfo *model.LiveInfo, flags ...bool) (string, string, error) {
 	// parse the optional flags
 	retryFlag := false
 	if len(flags) > 0 {
@@ -72,19 +70,19 @@ func GetM3U8Content(c *gin.Context, ChannelURL string, liveM3U8 string, ProxyUrl
 	}
 
 	retry := func(bodyString string, err error) (string, string, error) {
-		newUrl := liveM3U8
-		chStatus := GetStatus(ChannelURL)
+		newUrl := liveInfo.LiveUrl
+		chStatus := GetStatus(Channel.URL)
 		if !retryFlag && chStatus.RetryCount < MaxRetryCount {
 			// this channel was previously running ok, we give it a chance to reparse itself
-			log.Println(ChannelURL, "is unhealthy, doing a reparse...")
-			if li, err := UpdateURLCacheSingle(&model.Channel{URL: ChannelURL, ProxyUrl: ProxyUrl, Parser: Parser}, false); err == nil {
-				UpdateStatus(ChannelURL, Warning, "Unhealthy")
-				bodyString, newUrl, err = GetM3U8Content(c, ChannelURL, li.LiveUrl, ProxyUrl, Parser, true)
+			log.Println(Channel.URL, "is unhealthy, doing a reparse...")
+			if li, err := UpdateURLCacheSingle(Channel, false); err == nil {
+				UpdateStatus(Channel.URL, Warning, "Unhealthy")
+				bodyString, newUrl, err = GetM3U8Content(c, Channel, li, true)
 				if err == nil {
-					log.Println(ChannelURL, "is back online now")
-					UpdateStatus(ChannelURL, Ok, "Live!") // revert our temporary warning status to ok
+					log.Println(Channel.URL, "is back online now")
+					UpdateStatus(Channel.URL, Ok, "Live!") // revert our temporary warning status to ok
 				} else {
-					log.Println(ChannelURL, "is still unhealthy, giving up, currently points to", liveM3U8)
+					log.Println(Channel.URL, "is still unhealthy, giving up, currently points to", li.LiveUrl)
 				}
 				// if error still persists after a reparse, keep our warning status so that we won't endlessly reparse the same feed
 			}
@@ -92,14 +90,14 @@ func GetM3U8Content(c *gin.Context, ChannelURL string, liveM3U8 string, ProxyUrl
 		return bodyString, newUrl, err
 	}
 
-	li, _ := global.URLCache.Load(ChannelURL)
+	li, _ := global.URLCache.Load(Channel.URL)
 
 	var dialer Dialer
 	dialer = &net.Dialer{
 		Timeout: global.HttpClientTimeout,
 	}
-	if ProxyUrl != "" {
-		if u, err := url.Parse(ProxyUrl); err == nil {
+	if Channel.ProxyUrl != "" {
+		if u, err := url.Parse(Channel.ProxyUrl); err == nil {
 			if d, err := proxy.FromURL(u, dialer); err == nil {
 				dialer = d
 			}
@@ -110,10 +108,10 @@ func GetM3U8Content(c *gin.Context, ChannelURL string, liveM3U8 string, ProxyUrl
 		Transport: global.TransportWithProxy(""),
 		Jar:       global.CookieJar,
 	}
-	req, err := http.NewRequest(http.MethodGet, liveM3U8, nil)
+	req, err := http.NewRequest(http.MethodGet, liveInfo.LiveUrl, nil)
 	if err != nil {
 		log.Println(err)
-		return "", liveM3U8, err
+		return "", liveInfo.LiveUrl, err
 	}
 	req.Header.Set("User-Agent", DefaultUserAgent)
 	/* remove parameter passthrough as it may conflict with some servers
@@ -131,8 +129,8 @@ func GetM3U8Content(c *gin.Context, ChannelURL string, liveM3U8 string, ProxyUrl
 	*/
 
 	// allow plugins to decorate the m3u8 url
-	if p, err := plugin.GetPlugin(Parser); err == nil {
-		if transformer, ok := p.(plugin.Transformer); ok {
+	if p, err := GetPlugin(Channel.Parser); err == nil {
+		if transformer, ok := p.(Transformer); ok {
 			if li != nil {
 				transformer.Transform(req, li)
 			}
@@ -141,7 +139,7 @@ func GetM3U8Content(c *gin.Context, ChannelURL string, liveM3U8 string, ProxyUrl
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", liveM3U8, err
+		return "", liveInfo.LiveUrl, err
 	}
 
 	bodyString := ""
@@ -157,9 +155,9 @@ func GetM3U8Content(c *gin.Context, ChannelURL string, liveM3U8 string, ProxyUrl
 	contentType := strings.ToLower(resp.Header.Get("Content-Type"))
 	isValid := resp.ContentLength < 10*1024*1024 && (strings.Contains(contentType, "mpegurl") || strings.Contains(contentType, "text"))
 	if isValid {
-		bodyBytes, err := ioutil.ReadAll(resp.Body)
+		bodyBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return "", liveM3U8, err
+			return "", liveInfo.LiveUrl, err
 		}
 		bodyString = strings.TrimSpace(string(bodyBytes))
 		isValid = isValidM3U(bodyString)
@@ -169,8 +167,8 @@ func GetM3U8Content(c *gin.Context, ChannelURL string, liveM3U8 string, ProxyUrl
 	if isValid {
 		// do custom health checks
 		// retry on custom health check error
-		if p, err := plugin.GetPlugin(Parser); err == nil {
-			if checker, ok := p.(plugin.HealthCheck); ok {
+		if p, err := GetPlugin(Channel.Parser); err == nil {
+			if checker, ok := p.(HealthCheck); ok {
 				healthErr := checker.Check(bodyString, li)
 				if healthErr != nil {
 					return retry(bodyString, healthErr)
@@ -178,28 +176,30 @@ func GetM3U8Content(c *gin.Context, ChannelURL string, liveM3U8 string, ProxyUrl
 			}
 		}
 	} else {
-		UpdateStatus(ChannelURL, Warning, "Url is not a live stream")
-		duration, err := GetVideoDuration(ChannelURL)
+		UpdateStatus(Channel.URL, Warning, "Url is not a live stream")
+		duration, err := GetVideoDuration(Channel.URL)
 		if err == nil && duration > 0 {
-			log.Println(ChannelURL, "duration is", duration)
-			bodyString = fmt.Sprintf("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:%.0f\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXT-X-MEDIA-SEQUENCE:0\n#EXTINF:%.4f, video\n%s\n#EXT-X-ENDLIST", duration, duration, liveM3U8)
+			log.Println(Channel.URL, "duration is", duration)
+			bodyString = fmt.Sprintf("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:%.0f\n#EXT-X-PLAYLIST-TYPE:VOD\n#EXT-X-MEDIA-SEQUENCE:0\n#EXTINF:%.4f, video\n%s\n#EXT-X-ENDLIST", duration, duration, liveInfo.LiveUrl)
 		} else {
 			log.Println("failed to get duration", err.Error())
-			bodyString = "#EXTM3U\n#EXTINF:-1, video\n#EXT-X-PLAYLIST-TYPE:VOD\n" + liveM3U8 + "\n#EXT-X-ENDLIST" // make a fake m3u8 pointing to the target
+			bodyString = "#EXTM3U\n#EXTINF:-1, video\n#EXT-X-PLAYLIST-TYPE:VOD\n" + liveInfo.LiveUrl + "\n#EXT-X-ENDLIST" // make a fake m3u8 pointing to the target
 		}
 	}
-	return bodyString, liveM3U8, nil
+	return bodyString, liveInfo.LiveUrl, nil
 }
 
-func RealLiveM3U8(liveUrl string, proxyUrl string, Parser string) (*model.LiveInfo, error) {
+func RealLiveM3U8(channel *model.Channel) (*model.LiveInfo, error) {
+	Parser := channel.Parser
 	if Parser == "" {
 		Parser = "youtube" // backward compatible with old database, use youtube parser by default
 	}
-	if p, err := plugin.GetPlugin(Parser); err == nil {
-		if liveInfo, ok := global.URLCache.Load(liveUrl); ok {
-			return p.Parse(liveUrl, proxyUrl, liveInfo.ExtraInfo)
-		}
-		return p.Parse(liveUrl, proxyUrl, "")
+	if p, err := GetPlugin(Parser); err == nil {
+		//if liveInfo, ok := global.URLCache.Load(channel.URL); ok {
+		//	//return p.Parse(channel.URL, channel.ProxyUrl, liveInfo.ExtraInfo)
+		//	return p.Parse(channel, liveInfo)
+		//}
+		return p.Parse(channel, &model.LiveInfo{})
 	} else {
 		return nil, err
 	}

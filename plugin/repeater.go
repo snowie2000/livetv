@@ -3,6 +3,7 @@
 package plugin
 
 import (
+	"github.com/snowie2000/livetv/service"
 	"log"
 	"net/http"
 	"net/url"
@@ -21,51 +22,63 @@ func (p *RepeaterParser) Host(c *gin.Context, info *model.LiveInfo, chInfo *mode
 	return nil
 }
 
-func (p *RepeaterParser) Parse(liveUrl string, proxyUrl string, previousExtraInfo string) (*model.LiveInfo, error) {
-	u, err := url.Parse(liveUrl)
+func (p *RepeaterParser) Parse(channel *model.Channel, prevLiveInfo *model.LiveInfo) (*model.LiveInfo, error) {
+	u, err := url.Parse(channel.URL)
 	if err != nil {
 		return nil, err
 	}
 	// return non http protocol directly
 	if !strings.EqualFold(u.Scheme, "http") && !strings.EqualFold(u.Scheme, "https") {
 		li := &model.LiveInfo{}
-		li.LiveUrl = liveUrl
+		li.LiveUrl = channel.URL
 		return li, nil
 	}
 
 	client := http.Client{
 		Timeout:   time.Second * 10,
-		Transport: global.TransportWithProxy(proxyUrl),
+		Transport: global.TransportWithProxy(channel.ProxyUrl),
 		Jar:       global.CookieJar,
 	}
-	req, err := http.NewRequest("GET", liveUrl, nil)
+	req, err := http.NewRequest("GET", channel.URL, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", DefaultUserAgent)
+	req.Header.Set("User-Agent", service.DefaultUserAgent)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
 
+	liveUrl := resp.Request.URL.String() // replace source url with potentially redirected url
+	log.Println(liveUrl)
 	defer global.CloseBody(resp)
 	// the link itself is a valid M3U8
 	if strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "mpegurl") {
 		log.Println(liveUrl, "is a valid url")
-		liveUrl, err := bestFromMasterPlaylist(liveUrl, proxyUrl, resp.Body) // extract the best quality live url from the master playlist
+		liveUrl, err := service.BestFromMasterPlaylist(liveUrl, channel.ProxyUrl, resp.Body) // extract the best quality live url from the master playlist
 		if err == nil {
 			li := &model.LiveInfo{}
 			if !global.IsValidURL(liveUrl) {
 				liveUrl = global.GetBaseURL(liveUrl) + liveUrl
 			}
 			li.LiveUrl = liveUrl
-			li.ExtraInfo = previousExtraInfo
+			li.ExtraInfo = prevLiveInfo.ExtraInfo
 			return li, nil
 		}
 	}
-	return nil, NoMatchFeed
+	// check if the url is flv or other video streaming format
+	if strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "video") {
+		log.Println(liveUrl, "is a valid url")
+		if err == nil {
+			li := &model.LiveInfo{}
+			li.LiveUrl = liveUrl
+			li.ExtraInfo = prevLiveInfo.ExtraInfo
+			return li, nil
+		}
+	}
+	return nil, service.NoMatchFeed
 }
 
 func init() {
-	registerPlugin("repeater", &RepeaterParser{}, 6)
+	service.RegisterPlugin("repeater", &RepeaterParser{}, 6)
 }

@@ -55,15 +55,19 @@ func TXTGenerate() (string, error) {
 		if ch.Category != "" {
 			category = ch.Category
 		}
+		composedUrl := fmt.Sprintf("%s/live.m3u8?token=%s&c=%s", baseUrl, ch.Token, ch.ChannelID)
+		if ch.CustomQueryString != "" {
+			composedUrl = composedUrl + "&" + ch.CustomQueryString
+		}
 		if g, ok := genres[category]; ok {
-			g.addChannel(ch.Name, fmt.Sprintf("%s/live.m3u8?token=%s&c=%s", baseUrl, ch.Token, ch.ChannelID))
+			g.addChannel(ch.Name, composedUrl)
 		} else {
 			g = &genre{
 				name:     category,
 				channels: make(map[string][]string),
 			}
 			genreList = append(genreList, category)
-			g.addChannel(ch.Name, fmt.Sprintf("%s/live.m3u8?token=%s&c=%s", baseUrl, ch.Token, ch.ChannelID))
+			g.addChannel(ch.Name, composedUrl)
 			genres[category] = g
 		}
 	}

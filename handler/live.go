@@ -15,8 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/snowie2000/livetv/plugin"
-
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	"github.com/snowie2000/livetv/global"
@@ -151,6 +149,21 @@ func LiveHandler(c *gin.Context) {
 			}
 			return
 		}
+		if subNumber >= 0 {
+			mainChInfo, err := service.GetChannel(channelNumber, -1)
+			if err == nil {
+				parser, err := service.GetPlugin(mainChInfo.Parser)
+				if err == nil {
+					if chparser, ok := parser.(service.ChannelParser); ok {
+						newChannel := chparser.ParseChannelUrl(c.Request.URL.String(), mainChInfo)
+						// use parsed channel to replace our default parse result
+						if newChannel != nil {
+							channelInfo = newChannel
+						}
+					}
+				}
+			}
+		}
 		// baseUrl, err := global.GetConfig("base_url")
 		// if err != nil {
 		// 	log.Println(err)
@@ -161,7 +174,7 @@ func LiveHandler(c *gin.Context) {
 		// if proxyUrl == "" {
 		// 	proxyUrl = baseUrl
 		// }
-		liveInfo, err := service.GetLiveM3U8(channelInfo.URL, channelInfo.ProxyUrl, channelInfo.Parser)
+		liveInfo, err := service.GetLiveM3U8(channelInfo)
 		if err != nil {
 			log.Println(err)
 			// return a placeholder video
@@ -170,9 +183,9 @@ func LiveHandler(c *gin.Context) {
 			c.Writer.WriteString("This channel is not available")
 			return
 		} else {
-			parser, err := plugin.GetPlugin(channelInfo.Parser)
+			parser, err := service.GetPlugin(channelInfo.Parser)
 			if err == nil {
-				if handler, ok := parser.(plugin.FeedHost); ok {
+				if handler, ok := parser.(service.FeedHost); ok {
 					// handler has the ability host the feed and succeeded
 					if handler.Host(c, liveInfo, channelInfo) == nil {
 						return
@@ -188,19 +201,19 @@ func LiveHandler(c *gin.Context) {
 				bodyString string
 				finalUrl   string
 			)
-			if forger, ok := parser.(plugin.Forger); ok {
+			if forger, ok := parser.(service.Forger); ok {
 				// if supported, use forged m3u8 playlist
 				finalUrl, bodyString, err = forger.ForgeM3U8(liveInfo)
 			} else {
 				// the GetM3U8Content will handle health-check, reparse, url decoration etc. and returns the final result and the final url used
-				bodyString, finalUrl, err = service.GetM3U8Content(c, channelInfo.URL, liveInfo.LiveUrl, channelInfo.ProxyUrl, channelInfo.Parser)
+				bodyString, finalUrl, err = service.GetM3U8Content(c, channelInfo, liveInfo)
 			}
 			if bodyString == "" {
 				log.Println(err)
 				c.AbortWithStatus(http.StatusInternalServerError)
 				return
 			}
-			iTsTransformer, _ := parser.(plugin.TsTransformer)
+			iTsTransformer, _ := parser.(service.TsTransformer)
 			// get m3u8 content and transcode into tsproxy link if needed
 			m3u8Body = service.M3U8Process(finalUrl, bodyString, proxyUrl, global.GetLiveToken(), channelInfo.Proxy, channelNumber,
 				func(raw string, ts string) string {
@@ -264,7 +277,7 @@ func M3U8ProxyHandler(c *gin.Context) {
 		Jar:       global.CookieJar,
 	}
 	req, _ := http.NewRequest(http.MethodGet, remoteURL, nil)
-	req.Header.Set("User-Agent", plugin.DefaultUserAgent)
+	req.Header.Set("User-Agent", service.DefaultUserAgent)
 	//req.Header.Set("Accept-Encoding", "gzip")
 	// added possible custom headers
 	queries := c.Request.URL.Query()

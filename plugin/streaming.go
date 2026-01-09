@@ -5,6 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/snowie2000/livetv/global"
 	"github.com/snowie2000/livetv/model"
+	"github.com/snowie2000/livetv/service"
 	"github.com/snowie2000/livetv/util"
 	"net/http"
 	"net/url"
@@ -29,17 +30,17 @@ func (p *StreamingParser) Host(c *gin.Context, info *model.LiveInfo, chInfo *mod
 	return nil
 }
 
-func (p *StreamingParser) Parse(liveUrl string, proxyUrl string, previousExtraInfo string) (*model.LiveInfo, error) {
-	u, err := url.Parse(liveUrl)
+func (p *StreamingParser) Parse(channel *model.Channel, prevLiveInfo *model.LiveInfo) (*model.LiveInfo, error) {
+	u, err := url.Parse(channel.URL)
 	if err == nil && strings.HasPrefix(strings.ToLower(u.Scheme), "http") {
 		li := &model.LiveInfo{}
 		li.LiveUrl = u.String()
-		li.ExtraInfo = previousExtraInfo
+		li.ExtraInfo = prevLiveInfo.ExtraInfo
 		return li, nil
 	}
-	return nil, NoMatchFeed
+	return nil, service.NoMatchFeed
 }
 
 func init() {
-	registerPlugin("streaming", &StreamingParser{}, 3)
+	service.RegisterPlugin("streaming", &StreamingParser{}, 3)
 }

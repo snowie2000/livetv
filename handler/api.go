@@ -17,7 +17,6 @@ import (
 	freq "github.com/imroc/req/v3"
 	"github.com/snowie2000/livetv/global"
 	"github.com/snowie2000/livetv/model"
-	"github.com/snowie2000/livetv/plugin"
 	"github.com/snowie2000/livetv/recaptcha"
 	"github.com/snowie2000/livetv/service"
 	"github.com/snowie2000/livetv/util"
@@ -189,10 +188,12 @@ func loadConfig() (Config, error) {
 
 func CRSFHandler(c *gin.Context) {
 	session := sessions.Default(c)
-	// session.Options(sessions.Options{
-	// 	SameSite: http.SameSiteNoneMode,
-	// 	Secure:   true,
-	// })
+	session.Options(sessions.Options{
+		SameSite: http.SameSiteStrictMode,
+		Secure:   false,
+		MaxAge:   86400 * 7,
+		Path:     "/",
+	})
 	crsfToken := util.RandString(10)
 	session.Set("crsfToken", crsfToken)
 	err := session.Save()
@@ -208,7 +209,7 @@ func PluginListHandler(c *gin.Context) {
 		c.String(http.StatusUnauthorized, "Unauthorized")
 		return
 	}
-	list := plugin.GetPluginList()
+	list := service.GetPluginList()
 	c.JSON(http.StatusOK, list)
 }
 
@@ -251,25 +252,31 @@ func ChannelListHandler(c *gin.Context) {
 			Status:     status.Status,
 			Message:    status.Msg,
 			Category:   v.Category,
+			Extra:      v.Extra,
 		}
 		if len(v.Children) > 0 {
 			list := []Channel{}
 			for _, sub := range v.Children {
 				status := service.GetStatus(sub.URL)
 				subID := fmt.Sprintf("%d-%d", v.ID, sub.ID)
+				composedUrl := fmt.Sprintf("%s/live.m3u8?token=%s&c=%s", baseUrl, sub.Token, subID)
+				if sub.CustomQueryString != "" {
+					composedUrl = composedUrl + "&" + sub.CustomQueryString
+				}
 				c := Channel{
 					ID:         sub.ChannelID,
 					Name:       sub.Name,
 					URL:        sub.URL,
 					Parser:     sub.Parser,
 					TsProxy:    sub.TsProxy,
-					M3U8:       fmt.Sprintf("%s/live.m3u8?token=%s&c=%s", baseUrl, sub.Token, subID),
+					M3U8:       composedUrl,
 					Proxy:      sub.Proxy,
 					ProxyUrl:   sub.ProxyUrl,
 					LastUpdate: status.Time.Format("2006-01-02 15:04:05"),
 					Status:     status.Status,
 					Message:    status.Msg,
 					Category:   sub.Category,
+					Extra:      sub.Extra,
 					Virtual:    true, // sub channels are all virtual
 				}
 				list = append(list, c)
@@ -287,11 +294,12 @@ func NewChannelHandler(c *gin.Context) {
 		return
 	}
 	chName := c.PostForm("name")
-	chURL := c.PostForm("url")
-	chParser := c.PostForm("parser")
-	chProxyUrl := c.PostForm("proxyurl")
-	chTsProxy := c.PostForm("tsproxy")
-	chCategory := c.PostForm("category")
+	chURL := global.CleanString(c.PostForm("url"))
+	chParser := global.CleanString(c.PostForm("parser"))
+	chProxyUrl := global.CleanString(c.PostForm("proxyurl"))
+	chTsProxy := global.CleanString(c.PostForm("tsproxy"))
+	chCategory := global.CleanString(c.PostForm("category"))
+	chExtra := c.PostForm("extra")
 	if chName == "" || chURL == "" {
 		c.String(http.StatusBadRequest, "Incomplete channel info")
 		return
@@ -306,10 +314,11 @@ func NewChannelHandler(c *gin.Context) {
 		TsProxy:       chTsProxy,
 		Category:      chCategory,
 		HasSubChannel: false,
+		Extra:         chExtra,
 	}
 	// check if the parser can provide sub channels
-	if p, err := plugin.GetPlugin(chParser); err == nil {
-		if _, ok := p.(plugin.ChannalProvider); ok {
+	if p, err := service.GetPlugin(chParser); err == nil {
+		if _, ok := p.(service.ChannalProvider); ok {
 			mch.HasSubChannel = true
 		}
 	}
@@ -351,11 +360,12 @@ func UpdateChannelHandler(c *gin.Context) {
 		return
 	}
 	chName := c.PostForm("name")
-	chURL := c.PostForm("url")
-	chParser := c.PostForm("parser")
-	chProxyUrl := c.PostForm("proxyurl")
-	chTsProxy := c.PostForm("tsproxy")
-	chCategory := c.PostForm("category")
+	chURL := global.CleanString(c.PostForm("url"))
+	chParser := global.CleanString(c.PostForm("parser"))
+	chProxyUrl := global.CleanString(c.PostForm("proxyurl"))
+	chTsProxy := global.CleanString(c.PostForm("tsproxy"))
+	chCategory := global.CleanString(c.PostForm("category"))
+	chExtra := c.PostForm("extra")
 	if chName == "" || chURL == "" {
 		c.String(http.StatusBadRequest, "Incomplete channel info")
 		return
@@ -368,11 +378,12 @@ func UpdateChannelHandler(c *gin.Context) {
 	channel.URL = chURL
 	channel.TsProxy = chTsProxy
 	channel.Category = chCategory
+	channel.Extra = chExtra
 	channel.HasSubChannel = false
 
 	// check if the parser can provide sub channels
-	if p, err := plugin.GetPlugin(chParser); err == nil {
-		if _, ok := p.(plugin.ChannalProvider); ok {
+	if p, err := service.GetPlugin(chParser); err == nil {
+		if _, ok := p.(service.ChannalProvider); ok {
 			channel.HasSubChannel = true
 		}
 	}
@@ -498,10 +509,12 @@ func LoginViewHandler(c *gin.Context) {
 
 func LoginActionHandler(c *gin.Context) {
 	session := sessions.Default(c)
-	// session.Options(sessions.Options{
-	// 	SameSite: http.SameSiteNoneMode,
-	// 	Secure:   true,
-	// })
+	session.Options(sessions.Options{
+		SameSite: http.SameSiteStrictMode,
+		Secure:   false,
+		MaxAge:   86400 * 7,
+		Path:     "/",
+	})
 	crsfToken := c.PostForm("crsf")
 	if crsfToken != session.Get("crsfToken") {
 		log.Println(crsfToken, session.Get("crsfToken"))

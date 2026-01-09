@@ -35,8 +35,12 @@ func M3UGenerate() (string, error) {
 			logo = ch.Logo
 		}
 		liveData := fmt.Sprintf("#EXTINF:-1, tvg-name=%s tvg-logo=%s group-title=%s, %s\n", strconv.Quote(ch.Name), strconv.Quote(logo), strconv.Quote(category), ch.Name)
+		composedUrl := fmt.Sprintf("%s/live.m3u8?token=%s&c=%s", baseUrl, ch.Token, ch.ChannelID)
+		if ch.CustomQueryString != "" {
+			composedUrl = composedUrl + "&" + ch.CustomQueryString
+		}
 		m3u.WriteString(liveData)
-		m3u.WriteString(fmt.Sprintf("%s/live.m3u8?token=%s&c=%s\n", baseUrl, ch.Token, ch.ChannelID))
+		m3u.WriteString(composedUrl + "\n")
 	}
 	m3u.WriteString("#EXTM3U\n")
 	for _, v := range channels {

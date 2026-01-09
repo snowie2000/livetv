@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"github.com/snowie2000/livetv/model"
+	"github.com/snowie2000/livetv/service"
 )
 
 type M3URepeater struct {
@@ -18,5 +19,5 @@ func (p *M3URepeater) Channels(parentChannel *model.Channel, liveInfo *model.Liv
 }
 
 func init() {
-	registerPlugin("playlist-repeater", &M3URepeater{}, 5)
+	service.RegisterPlugin("playlist-repeater", &M3URepeater{}, 5)
 }

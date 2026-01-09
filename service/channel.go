@@ -6,9 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
-
-	"github.com/snowie2000/livetv/plugin"
 
 	"github.com/snowie2000/livetv/global"
 	"github.com/snowie2000/livetv/model"
@@ -28,13 +25,14 @@ func loadChannel(ch *model.Channel, loadSubChannels bool) {
 		}
 	} else {
 		ch.ChannelID = strconv.Itoa(ch.ID) // generate string ID for channel structs
+		ch.ParentID = ch.ChannelID
 		ch.Token = generateToken(ch.ChannelID)
 	}
 	if ch.HasSubChannel {
 		// get child channels
 		if liveInfo, ok := global.URLCache.Load(ch.URL); ok {
-			if p, err := plugin.GetPlugin(ch.Parser); err == nil {
-				if provider, ok := p.(plugin.ChannalProvider); ok {
+			if p, err := GetPlugin(ch.Parser); err == nil {
+				if provider, ok := p.(ChannalProvider); ok {
 					ch.Children = provider.Channels(ch, liveInfo)
 				}
 			}
@@ -81,7 +79,7 @@ func DeleteChannel(id int) error {
 	// iterate and delete the channel and all its subchannels
 	global.ChannelCache.Range(func(key string, value model.Channel) bool {
 		sid := strconv.Itoa(id)
-		if key == sid || strings.HasPrefix(key, sid+"-") {
+		if key == sid || value.ParentID == sid {
 			keys = append(keys, key)
 			statusCache.Delete(value.URL)
 		}
@@ -93,10 +91,14 @@ func DeleteChannel(id int) error {
 	return global.DB.Delete(model.Channel{}, "id = ?", id).Error
 }
 
-func InvalidateChannelCache(channels ...string) {
+func InvalidateChannelCache(channels ...*model.Channel) {
 	if len(channels) > 0 {
 		for _, ch := range channels {
-			global.ChannelCache.Delete(ch)
+			global.ChannelCache.Delete(ch.ChannelID)
+			global.ChannelCache.Delete(ch.ParentID)
+			if len(ch.Children) > 0 {
+				InvalidateChannelCache(ch.Children...) // recursively invalidate child channels
+			}
 		}
 	} else {
 		global.ChannelCache.Clear()

@@ -4,6 +4,7 @@ package plugin
 import (
 	"encoding/json"
 	"errors"
+	"github.com/snowie2000/livetv/service"
 	"io"
 	"log"
 	"net/http"
@@ -32,7 +33,7 @@ func isLive(m3u8Url string, proxyUrl string) bool {
 	if err != nil {
 		return false
 	}
-	req.Header.Set("User-Agent", DefaultUserAgent)
+	req.Header.Set("User-Agent", service.DefaultUserAgent)
 	resp, err := client.Do(req)
 	if err != nil {
 		return false
@@ -57,7 +58,7 @@ func parseUrl(liveUrl string, proxyUrl string) (*model.LiveInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", DefaultUserAgent)
+	req.Header.Set("User-Agent", service.DefaultUserAgent)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -75,7 +76,7 @@ func parseUrl(liveUrl string, proxyUrl string) (*model.LiveInfo, error) {
 	if matches != nil {
 		gps := matches.Groups()
 		liveMasterUrl := gps[0].Captures[0].String()
-		liveUrl, err := bestFromMasterPlaylist(liveMasterUrl, proxyUrl) // extract the best quality live url from the master playlist
+		liveUrl, err := service.BestFromMasterPlaylist(liveMasterUrl, proxyUrl) // extract the best quality live url from the master playlist
 		if err != nil {
 			return nil, err
 		}
@@ -106,7 +107,7 @@ func parseUrl(liveUrl string, proxyUrl string) (*model.LiveInfo, error) {
 		li.ExtraInfo = string(sExtra)
 		return li, nil
 	}
-	return nil, NoMatchFeed
+	return nil, service.NoMatchFeed
 }
 
 func (p *YoutubeParser) Check(content string, info *model.LiveInfo) error {
@@ -116,19 +117,20 @@ func (p *YoutubeParser) Check(content string, info *model.LiveInfo) error {
 	return nil
 }
 
-func (p *YoutubeParser) Parse(liveUrl string, proxyUrl string, previousExtraInfo string) (*model.LiveInfo, error) {
+func (p *YoutubeParser) Parse(channel *model.Channel, prevLiveInfo *model.LiveInfo) (*model.LiveInfo, error) {
+	previousExtraInfo := prevLiveInfo.ExtraInfo
 	var info YoutubeExtraInfo
 	json.Unmarshal([]byte(previousExtraInfo), &info)
 	// for generic urls like "youtube.com/@channel/live", we try last url first, then the generic url
-	if getYouTubeVideoID(liveUrl) == "" && info.LastUrl != "" {
-		if li, err := parseUrl(info.LastUrl, proxyUrl); err == nil {
+	if service.GetYouTubeVideoID(channel.URL) == "" && info.LastUrl != "" {
+		if li, err := parseUrl(info.LastUrl, channel.ProxyUrl); err == nil {
 			log.Println("Reused last url for video interpretation:", info.LastUrl)
 			return li, err
 		}
 	}
-	return parseUrl(liveUrl, proxyUrl)
+	return parseUrl(channel.URL, channel.ProxyUrl)
 }
 
 func init() {
-	registerPlugin("youtube", &YoutubeParser{}, 2)
+	service.RegisterPlugin("youtube", &YoutubeParser{}, 2)
 }

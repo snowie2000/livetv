@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/snowie2000/livetv/service"
 	"io"
 	"net/http"
 	"net/url"
@@ -33,28 +34,41 @@ type M3UPlayList struct {
 	Channels []ParsedChannel
 }
 
-func (p *M3UParser) Parse(liveUrl string, proxyUrl string, previousExtraInfo string) (*model.LiveInfo, error) {
-	_, err := url.Parse(liveUrl)
+func (p *M3UParser) Transform(req *http.Request, info *model.LiveInfo) error {
+	var ui service.UrlInfo
+	json.Unmarshal([]byte(info.ExtraInfo), &ui)
+	for v, k := range ui.Headers {
+		req.Header.Set(v, k)
+	}
+	return nil
+}
+
+// func (p *M3UParser) Parse(liveUrl string, proxyUrl string, previousExtraInfo string) (*model.LiveInfo, error) {
+func (p *M3UParser) Parse(channel *model.Channel, prevLiveInfo *model.LiveInfo) (*model.LiveInfo, error) {
+	_, err := url.Parse(channel.URL)
 	if err != nil {
 		return nil, err
 	}
 
 	client := http.Client{
 		Timeout:   time.Second * 10,
-		Transport: global.TransportWithProxy(proxyUrl),
+		Transport: global.TransportWithProxy(channel.ProxyUrl),
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 		Jar: global.CookieJar,
 	}
-	req, err := http.NewRequest("GET", liveUrl, nil)
+	req, err := http.NewRequest("GET", channel.URL, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", DefaultUserAgent)
+	req.Header.Set("User-Agent", service.DefaultUserAgent)
+	p.Transform(req, &model.LiveInfo{
+		ExtraInfo: channel.Extra,
+	})
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, service.RetryOutdated
 	}
 	defer global.CloseBody(resp)
 
@@ -64,7 +78,7 @@ func (p *M3UParser) Parse(liveUrl string, proxyUrl string, previousExtraInfo str
 
 	content, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, service.RetryOutdated
 	}
 
 	if playlist, err := m3u.ParseFromReader(bytes.NewBuffer(content)); err == nil {
@@ -76,7 +90,7 @@ func (p *M3UParser) Parse(liveUrl string, proxyUrl string, previousExtraInfo str
 				Name:     track.Name,
 				URL:      track.URI,
 				Proxy:    false,
-				ProxyUrl: proxyUrl,
+				ProxyUrl: channel.ProxyUrl,
 				Logo:     "",
 			}
 			for _, tag := range track.Tags {
@@ -113,7 +127,7 @@ func (p *M3UParser) Parse(liveUrl string, proxyUrl string, previousExtraInfo str
 						Name:     track.Name,
 						URL:      source.Url,
 						Proxy:    false,
-						ProxyUrl: proxyUrl,
+						ProxyUrl: channel.ProxyUrl,
 						Logo:     "",
 					}
 					parsedList = append(parsedList, channel)
@@ -139,6 +153,7 @@ func (p *M3UParser) Channels(parentChannel *model.Channel, liveInfo *model.LiveI
 	for _, it := range parsedList {
 		channel := &model.Channel{
 			ID:        it.ID,
+			ParentID:  parentChannel.ChannelID,
 			ChannelID: fmt.Sprintf("%d-%d", parentChannel.ID, it.ID),
 			Category:  it.Category,
 			Name:      it.Name,
@@ -148,6 +163,7 @@ func (p *M3UParser) Channels(parentChannel *model.Channel, liveInfo *model.LiveI
 			ProxyUrl:  parentChannel.ProxyUrl,
 			Proxy:     parentChannel.Proxy,
 			TsProxy:   parentChannel.TsProxy,
+			Extra:     parentChannel.Extra,
 		}
 		channels = append(channels, channel)
 	}
@@ -155,5 +171,5 @@ func (p *M3UParser) Channels(parentChannel *model.Channel, liveInfo *model.LiveI
 }
 
 func init() {
-	registerPlugin("playlist", &M3UParser{}, 4)
+	service.RegisterPlugin("playlist", &M3UParser{}, 4)
 }

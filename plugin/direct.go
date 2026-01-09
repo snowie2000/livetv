@@ -3,6 +3,7 @@ package plugin
 
 import (
 	"encoding/json"
+	"github.com/snowie2000/livetv/service"
 	"io"
 	"net/http"
 	"net/url"
@@ -15,7 +16,7 @@ import (
 type DirectM3U8Parser struct{}
 
 func (p *DirectM3U8Parser) Transform(req *http.Request, info *model.LiveInfo) error {
-	var ui UrlInfo
+	var ui service.UrlInfo
 	json.Unmarshal([]byte(info.ExtraInfo), &ui)
 	for v, k := range ui.Headers {
 		req.Header.Set(v, k)
@@ -24,7 +25,7 @@ func (p *DirectM3U8Parser) Transform(req *http.Request, info *model.LiveInfo) er
 }
 
 func (p *DirectM3U8Parser) TransformTs(rawLink string, tsLink string, info *model.LiveInfo) string {
-	var ui UrlInfo
+	var ui service.UrlInfo
 	json.Unmarshal([]byte(info.ExtraInfo), &ui)
 	u, err := url.Parse(tsLink)
 	if err == nil {
@@ -55,12 +56,12 @@ func (p *DirectM3U8Parser) Parse(liveUrl string, proxyUrl string, previousExtraI
 		if err != nil {
 			return nil, err
 		}
-		req.Header.Set("User-Agent", DefaultUserAgent)
+		req.Header.Set("User-Agent", service.DefaultUserAgent)
 		// allow adding custom transformations
 		p.Transform(req, &model.LiveInfo{
 			ExtraInfo: previousExtraInfo,
 		})
-		resp, err := cloudScraper(req, proxyUrl) // client.Do(req)
+		resp, err := service.CloudScraper(req, proxyUrl) // client.Do(req)
 		if err != nil {
 			return nil, err
 		}
@@ -69,7 +70,7 @@ func (p *DirectM3U8Parser) Parse(liveUrl string, proxyUrl string, previousExtraI
 		defer global.CloseBody(resp)
 	}
 
-	bestUrl, err := bestFromMasterPlaylist(liveUrl, proxyUrl, content) // extract the best quality live url from the master playlist
+	bestUrl, err := service.BestFromMasterPlaylist(liveUrl, proxyUrl, content) // extract the best quality live url from the master playlist
 	if err == nil {
 		li := &model.LiveInfo{}
 		if !global.IsValidURL(bestUrl) {
@@ -80,5 +81,5 @@ func (p *DirectM3U8Parser) Parse(liveUrl string, proxyUrl string, previousExtraI
 		return li, nil
 	}
 
-	return nil, NoMatchFeed
+	return nil, service.NoMatchFeed
 }

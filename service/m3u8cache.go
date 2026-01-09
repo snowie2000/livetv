@@ -1,12 +1,12 @@
 package service
 
 import (
+	"errors"
 	"log"
 
 	"github.com/LgoLgo/geentrant"
 	"github.com/snowie2000/livetv/global"
 	"github.com/snowie2000/livetv/model"
-	"github.com/snowie2000/livetv/plugin"
 )
 
 var updateConcurrent = &greetrant.RecursiveMutex{}
@@ -33,8 +33,8 @@ func LoadChannelCache() {
 
 func UpdateSubChannels(parentChannel *model.Channel, liveInfo *model.LiveInfo, Parser string, bUpdateStatus bool) {
 	// let's check if there are any sub channels
-	if p, err := plugin.GetPlugin(Parser); err == nil {
-		if provider, ok := p.(plugin.ChannalProvider); ok {
+	if p, err := GetPlugin(Parser); err == nil {
+		if provider, ok := p.(ChannalProvider); ok {
 			subchannels := provider.Channels(parentChannel, liveInfo)
 			canceled := false
 			if len(subchannels) > 0 {
@@ -65,10 +65,14 @@ func UpdateURLCacheSingle(channel *model.Channel, bUpdateStatus bool) (*model.Li
 		updateConcurrent.Unlock()
 	}()
 	log.Println("caching", channel.URL)
-	liveInfo, err := RealLiveM3U8(channel.URL, channel.ProxyUrl, channel.Parser)
+	liveInfo, err := RealLiveM3U8(channel)
 	if err != nil {
-		global.URLCache.Delete(channel.URL)
-		UpdateStatus(channel.URL, Error, err.Error())
+		if errors.Is(err, RetryOutdated) {
+			UpdateStatus(channel.URL, Warning, err.Error())
+		} else {
+			global.URLCache.Delete(channel.URL)
+			UpdateStatus(channel.URL, Error, err.Error())
+		}
 		log.Println("[LiveTV]", err)
 	} else {
 		// cache parsed result
@@ -78,8 +82,10 @@ func UpdateURLCacheSingle(channel *model.Channel, bUpdateStatus bool) (*model.Li
 		}
 		log.Println(channel.URL, "cached")
 
-		InvalidateChannelCache(channel.ChannelID)
 		UpdateSubChannels(channel, liveInfo, channel.Parser, bUpdateStatus)
+		if channel.ChannelID == channel.ParentID { // invalidate and reload primary channel only (sub channels will be invalidated automatically)
+			InvalidateChannelCache(channel)
+		}
 	}
 	return liveInfo, err
 }
