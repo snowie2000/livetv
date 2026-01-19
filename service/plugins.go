@@ -209,6 +209,20 @@ func GetPluginList() []string {
 	return list
 }
 
+func CleanUrl(u string) string {
+	// remove control characters and all invalid URL characters
+	u = strings.TrimSpace(u)
+	// remove all characters from 0x00 to 0x1F and 0x7F to 0x9F
+	var sb strings.Builder
+	for _, r := range u {
+		if r >= 0x20 && r != 0x7F {
+			sb.WriteRune(r)
+		}
+	}
+	u = sb.String()
+	return u
+}
+
 func init() {
 	httpproxy.RegisterSchemes()
 }

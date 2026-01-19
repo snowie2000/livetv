@@ -3,11 +3,12 @@ package plugin
 
 import (
 	"encoding/json"
-	"github.com/snowie2000/livetv/service"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/snowie2000/livetv/service"
 
 	"github.com/snowie2000/livetv/global"
 	"github.com/snowie2000/livetv/model"
@@ -40,7 +41,7 @@ func (p *DirectM3U8Parser) TransformTs(rawLink string, tsLink string, info *mode
 }
 
 func (p *DirectM3U8Parser) Parse(liveUrl string, proxyUrl string, previousExtraInfo string, content io.Reader) (*model.LiveInfo, error) {
-	u, err := url.Parse(liveUrl)
+	u, err := url.Parse(service.CleanUrl(liveUrl))
 	if err != nil {
 		return nil, err
 	}

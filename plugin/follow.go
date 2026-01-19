@@ -5,12 +5,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/snowie2000/livetv/service"
 	"io"
 	"log"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/snowie2000/livetv/service"
 
 	"github.com/snowie2000/livetv/global"
 	"github.com/snowie2000/livetv/model"
@@ -21,7 +22,7 @@ type URLM3U8Parser struct {
 }
 
 func (p *URLM3U8Parser) Parse(channel *model.Channel, prevLiveInfo *model.LiveInfo) (*model.LiveInfo, error) {
-	liveUrl := channel.URL
+	liveUrl := service.CleanUrl(channel.URL)
 	previousExtraInfo := strings.TrimSpace(prevLiveInfo.ExtraInfo)
 	if previousExtraInfo == "" {
 		previousExtraInfo = channel.Extra
