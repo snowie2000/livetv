@@ -11,7 +11,7 @@ Download the latest binary from [releases](https://github.com/snowie2000/livetv/
 
 Precompiled images are available as `flyingsnow2000/livetv:latest` and `flyingsnow2000/livetv:version_number`. Only linux/amd64 is currently available. Images for other platforms require a custom image build.
 
-Python 3.13, yt-dlp latest and bgutil-ytdlp-pot-provider is included in the image.
+`Python 3.13`, `yt-dlp latest` and `bgutil-ytdlp-pot-provider` are included in the image and can be used in the yt-dlp extractorargs directly.
 
 
 ### How to start
