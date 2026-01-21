@@ -5,15 +5,31 @@ Aggregate IPTV feeds in one station and enjoy!
 
 ## Install 
 
-A custom compiling is required. Docker image is not available yet.
+Download the latest binary from [releases](https://github.com/snowie2000/livetv/releases) 
 
-```bash
-git clone https://github.com/snowie2000/livetv
-cd livetv
-go build
+## Docker
+
+Precompiled images are available as `flyingsnow2000/livetv:latest` and `flyingsnow2000/livetv:version_number`. Only linux/amd64 is currently available. Images for other platforms require a custom image build.
+
+Python 3.13, yt-dlp latest and bgutil-ytdlp-pot-provider is included in the image.
+
+
+### How to start
+```
+docker run --name livetv -p 9000:9000 -v /path/to/data:/opt/livetv/data -d flyingsnow2000/livetv:latest
 ```
 
 ## Usage
+
+```
+Usage of ./livetv:
+  -disable-protection
+        temporarily disable token protection
+  -listen string
+        listening address (default ":9000")
+  -pwd string
+        reset password
+```
 
 Default password is "password".
 
