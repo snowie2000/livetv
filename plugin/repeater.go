@@ -50,7 +50,6 @@ func (p *RepeaterParser) Parse(channel *model.Channel, prevLiveInfo *model.LiveI
 	}
 
 	liveUrl := resp.Request.URL.String() // replace source url with potentially redirected url
-	log.Println(liveUrl)
 	defer global.CloseBody(resp)
 	// the link itself is a valid M3U8
 	if strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "mpegurl") {

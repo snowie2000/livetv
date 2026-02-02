@@ -199,6 +199,16 @@ func RealLiveM3U8(channel *model.Channel) (*model.LiveInfo, error) {
 		//	//return p.Parse(channel.URL, channel.ProxyUrl, liveInfo.ExtraInfo)
 		//	return p.Parse(channel, liveInfo)
 		//}
+		if d, ok := p.(Detector); ok {
+			newPlugin, err := d.Detect(channel)
+			if err != nil {
+				return nil, err
+			}
+			if p, err = GetPlugin(newPlugin); err != nil {
+				return nil, err
+			}
+			channel.Parser = newPlugin
+		}
 		return p.Parse(channel, &model.LiveInfo{})
 	} else {
 		return nil, err

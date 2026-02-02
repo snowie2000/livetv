@@ -151,7 +151,7 @@ func CloseBody(resp any) {
 			// if the body is already read in some scenarios, the below operation becomes a no-op
 			_, _ = io.Copy(io.Discard, resp.Body)
 			_ = resp.Body.Close()
-			fmt.Println("freq response closed")
+			//fmt.Println("freq response closed")
 		}
 	}
 }

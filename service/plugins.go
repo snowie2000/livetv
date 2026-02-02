@@ -27,6 +27,10 @@ type Plugin interface {
 	Parse(channel *model.Channel, prevLiveInfo *model.LiveInfo) (info *model.LiveInfo, error error)
 }
 
+type Detector interface {
+	Detect(channel *model.Channel) (string, error)
+}
+
 type ChannalProvider interface {
 	Channels(parentChannel *model.Channel, liveInfo *model.LiveInfo) []*model.Channel
 }

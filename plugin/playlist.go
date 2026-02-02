@@ -158,7 +158,7 @@ func (p *M3UParser) Channels(parentChannel *model.Channel, liveInfo *model.LiveI
 			Category:  it.Category,
 			Name:      it.Name,
 			Logo:      it.Logo,
-			Parser:    "http",
+			Parser:    "auto",
 			URL:       it.URL,
 			ProxyUrl:  parentChannel.ProxyUrl,
 			Proxy:     parentChannel.Proxy,

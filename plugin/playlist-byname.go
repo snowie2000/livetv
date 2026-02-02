@@ -31,7 +31,7 @@ func (p *M3USearcher) Parse(channel *model.Channel, prevLiveInfo *model.LiveInfo
 				Category:  it.Category,
 				Name:      it.Name,
 				Logo:      it.Logo,
-				Parser:    "http",
+				Parser:    "auto",
 				URL:       it.URL,
 				ProxyUrl:  channel.ProxyUrl,
 				Proxy:     channel.Proxy,
