@@ -9,7 +9,6 @@ import (
 	"github.com/snowie2000/livetv/util"
 	"net/http"
 	"net/url"
-	"path"
 	"strings"
 )
 
@@ -22,8 +21,8 @@ func (p *StreamingParser) Host(c *gin.Context, info *model.LiveInfo, chInfo *mod
 	if chInfo.Proxy {
 		// if proxy stream is enabled, redirect to the universal reverse proxy with our secret
 		proxyTarget = fmt.Sprintf("/proxy?token=%s&k=%s&proxy=%s", global.GetLiveToken(), util.CompressString(info.LiveUrl), url.QueryEscape(chInfo.ProxyUrl))
-		if chInfo.TsProxy == "" {
-			proxyTarget = path.Join(chInfo.TsProxy, proxyTarget)
+		if chInfo.TsProxy != "" {
+			proxyTarget = strings.TrimRight(chInfo.TsProxy, "/") + proxyTarget
 		}
 	}
 	http.Redirect(c.Writer, c.Request, proxyTarget, http.StatusFound)
