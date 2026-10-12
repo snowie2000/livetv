@@ -24,7 +24,7 @@ func (p *M3USearcher) Parse(channel *model.Channel, prevLiveInfo *model.LiveInfo
 		json.Unmarshal([]byte(li.ExtraInfo), &parsedList)
 		chMap := syncx.NewHashedSlice[*model.Channel]()
 		for _, it := range parsedList {
-			channel := &model.Channel{
+			subCh := &model.Channel{
 				ID:        it.ID,
 				ParentID:  channel.ChannelID,
 				ChannelID: fmt.Sprintf("%d-%d", channel.ID, it.ID),
@@ -38,8 +38,8 @@ func (p *M3USearcher) Parse(channel *model.Channel, prevLiveInfo *model.LiveInfo
 				TsProxy:   channel.TsProxy,
 				Extra:     channel.Extra,
 			}
-			channel.CustomQueryString = fmt.Sprintf("sid=%s", channel.Digest())
-			chMap.Add(channel)
+			subCh.CustomQueryString = fmt.Sprintf("sid=%s", subCh.Digest())
+			_ = chMap.Add(subCh)
 		}
 		channelIndex.Store(channel.ChannelID, chMap)
 	}

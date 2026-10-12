@@ -38,7 +38,8 @@ func FetchHandler(c *gin.Context) {
 	// verify token against the unique token of the requested channel
 	if !disableProtection {
 		token := c.Query("token")
-		if token != global.GetSecretToken() { // invalid token
+		secretToken := global.GetSecretToken()
+		if secretToken == "" || token != secretToken { // invalid token
 			c.String(http.StatusForbidden, "Forbidden")
 			return
 		}
@@ -126,6 +127,9 @@ func FetchHandler(c *gin.Context) {
 }
 
 func CaptchaHandler(c *gin.Context) {
+	c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+	c.Header("Pragma", "no-cache")
+	c.Header("Expires", "0")
 	if sessions.Default(c).Get("logined") == true {
 		c.String(http.StatusOK, "{}") // do not generate captcha for loggin users
 		return
@@ -187,13 +191,12 @@ func loadConfig() (Config, error) {
 }
 
 func CRSFHandler(c *gin.Context) {
+	c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+	c.Header("Pragma", "no-cache")
+	c.Header("Expires", "0")
+
 	session := sessions.Default(c)
-	session.Options(sessions.Options{
-		SameSite: http.SameSiteStrictMode,
-		Secure:   false,
-		MaxAge:   86400 * 7,
-		Path:     "/",
-	})
+	session.Options(GetSessionOptions(c))
 	crsfToken := util.RandString(10)
 	session.Set("crsfToken", crsfToken)
 	err := session.Save()
@@ -205,19 +208,11 @@ func CRSFHandler(c *gin.Context) {
 }
 
 func PluginListHandler(c *gin.Context) {
-	if sessions.Default(c).Get("logined") != true {
-		c.String(http.StatusUnauthorized, "Unauthorized")
-		return
-	}
 	list := service.GetPluginList()
 	c.JSON(http.StatusOK, list)
 }
 
 func ChannelListHandler(c *gin.Context) {
-	if sessions.Default(c).Get("logined") != true {
-		c.String(http.StatusUnauthorized, "Unauthorized")
-		return
-	}
 	baseUrl, err := global.GetConfig("base_url")
 	if err != nil {
 		log.Println(err.Error())
@@ -289,10 +284,6 @@ func ChannelListHandler(c *gin.Context) {
 }
 
 func NewChannelHandler(c *gin.Context) {
-	if sessions.Default(c).Get("logined") != true {
-		c.String(http.StatusUnauthorized, "Unauthorized")
-		return
-	}
 	chName := c.PostForm("name")
 	chURL := global.CleanString(c.PostForm("url"))
 	chParser := global.CleanString(c.PostForm("parser"))
@@ -333,18 +324,10 @@ func NewChannelHandler(c *gin.Context) {
 }
 
 func AuthProbeHandler(c *gin.Context) {
-	if sessions.Default(c).Get("logined") != true {
-		c.String(http.StatusUnauthorized, "Unauthorized")
-	} else {
-		c.String(http.StatusOK, "")
-	}
+	c.String(http.StatusOK, "")
 }
 
 func UpdateChannelHandler(c *gin.Context) {
-	if sessions.Default(c).Get("logined") != true {
-		c.String(http.StatusUnauthorized, "Unauthorized")
-		return
-	}
 	chID, chSubId := getChannelNumbers(c.PostForm("id"))
 	if chID == 0 {
 		c.String(http.StatusInternalServerError, "empty id")
@@ -398,10 +381,6 @@ func UpdateChannelHandler(c *gin.Context) {
 }
 
 func DeleteChannelHandler(c *gin.Context) {
-	if sessions.Default(c).Get("logined") != true {
-		c.String(http.StatusUnauthorized, "Unauthorized")
-		return
-	}
 	chID, chSubId := getChannelNumbers(c.Query("id"))
 	if chID == 0 {
 		c.String(http.StatusInternalServerError, "empty id")
@@ -421,10 +400,6 @@ func DeleteChannelHandler(c *gin.Context) {
 }
 
 func GetConfigHandler(c *gin.Context) {
-	if sessions.Default(c).Get("logined") != true {
-		c.String(http.StatusUnauthorized, "Unauthorized")
-		return
-	}
 	conf, err := loadConfig()
 	if err != nil {
 		log.Println(err.Error())
@@ -435,19 +410,11 @@ func GetConfigHandler(c *gin.Context) {
 }
 
 func CategoryHandler(c *gin.Context) {
-	if sessions.Default(c).Get("logined") != true {
-		c.String(http.StatusUnauthorized, "Unauthorized")
-		return
-	}
 	categories := global.GetAllCategories()
 	c.JSON(http.StatusOK, categories)
 }
 
 func UpdateConfigHandler(c *gin.Context) {
-	if sessions.Default(c).Get("logined") != true {
-		c.String(http.StatusUnauthorized, "Unauthorized")
-		return
-	}
 	ytdlCmd := c.PostForm("cmd")
 	ytdlArgs := c.PostForm("args")
 	baseUrl := strings.TrimSuffix(c.PostForm("baseurl"), "/")
@@ -484,15 +451,16 @@ func UpdateConfigHandler(c *gin.Context) {
 }
 
 func LogHandler(c *gin.Context) {
-	if sessions.Default(c).Get("logined") != true {
-		c.String(http.StatusUnauthorized, "Unauthorized")
-		return
-	}
 	c.File(os.Getenv("LIVETV_DATADIR") + "/livetv.log")
 }
 
 func LoginViewHandler(c *gin.Context) {
+	c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+	c.Header("Pragma", "no-cache")
+	c.Header("Expires", "0")
+
 	session := sessions.Default(c)
+	session.Options(GetSessionOptions(c))
 	crsfToken := util.RandString(10)
 	session.Set("crsfToken", crsfToken)
 	err := session.Save()
@@ -509,22 +477,12 @@ func LoginViewHandler(c *gin.Context) {
 
 func LoginActionHandler(c *gin.Context) {
 	session := sessions.Default(c)
-	session.Options(sessions.Options{
-		SameSite: http.SameSiteStrictMode,
-		Secure:   false,
-		MaxAge:   86400 * 7,
-		Path:     "/",
-	})
-	crsfToken := c.PostForm("crsf")
-	if crsfToken != session.Get("crsfToken") {
-		log.Println(crsfToken, session.Get("crsfToken"))
-		c.String(http.StatusBadRequest, "bad request")
-		return
-	}
-	// verify captcha before verifying password so as to protect us from bruteforce attack.
+	session.Options(GetSessionOptions(c))
+
+	// verify captcha before verifying password so as to protect us from bruteforce attack and CSRF.
 	captchaId := c.PostForm("captcha_id")
 	captchaAnswer := c.PostForm("answer")
-	if !recaptcha.DefaultCaptcha.Verify(&recaptcha.CaptchaData{captchaId, "", captchaAnswer}) {
+	if !recaptcha.DefaultCaptcha.Verify(&recaptcha.CaptchaData{CaptchaId: captchaId, Answer: captchaAnswer}) {
 		c.String(http.StatusForbidden, "Invalid captcha")
 		return
 	}
@@ -549,12 +507,10 @@ func LoginActionHandler(c *gin.Context) {
 }
 
 func LogoutHandler(c *gin.Context) {
-	if sessions.Default(c).Get("logined") != true {
-		c.String(http.StatusOK, "")
-		return
-	}
 	session := sessions.Default(c)
+	session.Options(GetSessionOptions(c))
 	session.Delete("logined")
+	session.Delete("crsfToken")
 	err := session.Save()
 	if err != nil {
 		log.Println(err.Error())
@@ -575,17 +531,15 @@ func CORSHandler(c *gin.Context) {
 }
 
 func ChangePasswordHandler(c *gin.Context) {
-	if sessions.Default(c).Get("logined") != true {
-		c.String(http.StatusUnauthorized, "Unauthorized")
-		return
-	}
 	pass := c.PostForm("password")
 	pass2 := c.PostForm("password2")
 	if pass == "" {
 		c.String(http.StatusBadRequest, "Empty password!")
+		return
 	}
 	if pass != pass2 {
 		c.String(http.StatusBadRequest, "Password mismatch!")
+		return
 	}
 	err := global.SetConfig("password", pass)
 	if err != nil {

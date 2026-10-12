@@ -2,6 +2,7 @@ package global
 
 import (
 	"encoding/base64"
+	"sync"
 
 	"github.com/jinzhu/gorm"
 	"github.com/snowie2000/livetv/model"
@@ -17,26 +18,40 @@ func strongKey(key string) []byte {
 func GetConfig(key string) (string, error) {
 	if confValue, ok := ConfigCache.Load(key); ok {
 		return confValue, nil
-	} else {
-		var value model.Config
-		err := DB.Where("name = ?", key).First(&value).Error
-		if err != nil {
-			if gorm.IsRecordNotFoundError(err) {
-				return "", ErrConfigNotFound
-			} else {
-				return "", err
-			}
+	}
+	if DB == nil {
+		return "", ErrConfigNotFound
+	}
+	var value model.Config
+	err := DB.Where("name = ?", key).First(&value).Error
+	if err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			return "", ErrConfigNotFound
 		} else {
-			ConfigCache.Store(key, value.Data)
-			return value.Data, nil
+			return "", err
 		}
+	} else {
+		ConfigCache.Store(key, value.Data)
+		return value.Data, nil
 	}
 }
 
-var strongSecret string = ""
-var strongLiveSecret string = ""
+var (
+	secretMu         sync.RWMutex
+	strongSecret     string = ""
+	strongLiveSecret string = ""
+)
 
 func GetSecretToken() string {
+	secretMu.RLock()
+	if strongSecret != "" {
+		defer secretMu.RUnlock()
+		return strongSecret
+	}
+	secretMu.RUnlock()
+
+	secretMu.Lock()
+	defer secretMu.Unlock()
 	if strongSecret == "" {
 		secret, _ := GetConfig("secret")
 		if secret == "" {
@@ -49,6 +64,15 @@ func GetSecretToken() string {
 }
 
 func GetLiveToken() string {
+	secretMu.RLock()
+	if strongLiveSecret != "" {
+		defer secretMu.RUnlock()
+		return strongLiveSecret
+	}
+	secretMu.RUnlock()
+
+	secretMu.Lock()
+	defer secretMu.Unlock()
 	if strongLiveSecret == "" {
 		secret, _ := GetConfig("secret")
 		if secret == "" {
@@ -61,12 +85,16 @@ func GetLiveToken() string {
 }
 
 func ClearSecretToken() {
+	secretMu.Lock()
 	strongSecret = ""
 	strongLiveSecret = ""
+	secretMu.Unlock()
 	ChannelCache.Clear()
 }
 
 func SetConfig(key, value string) error {
+	DBWriteMu.Lock()
+	defer DBWriteMu.Unlock()
 	data := model.Config{Name: key, Data: value}
 	err := DB.Save(&data).Error
 	if err == nil {

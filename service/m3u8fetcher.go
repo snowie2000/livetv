@@ -6,26 +6,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"io"
 	"log"
-	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
-
-	"golang.org/x/net/proxy"
 
 	httpproxy "github.com/fopina/net-proxy-httpconnect/proxy"
 
 	"github.com/snowie2000/livetv/global"
 	"github.com/snowie2000/livetv/model"
 )
-
-// A Dialer is a means to establish a connection.
-// Custom dialers should also implement ContextDialer.
-type Dialer interface {
-	// Dial connects to the given address via the proxy.
-	Dial(network, addr string) (c net.Conn, err error)
-}
 
 var errNoMatchFound error = errors.New("This channel is not currently live")
 
@@ -92,20 +81,9 @@ func GetM3U8Content(c *gin.Context, Channel *model.Channel, liveInfo *model.Live
 
 	li, _ := global.URLCache.Load(Channel.URL)
 
-	var dialer Dialer
-	dialer = &net.Dialer{
-		Timeout: global.HttpClientTimeout,
-	}
-	if Channel.ProxyUrl != "" {
-		if u, err := url.Parse(Channel.ProxyUrl); err == nil {
-			if d, err := proxy.FromURL(u, dialer); err == nil {
-				dialer = d
-			}
-		}
-	}
 	client := http.Client{
 		Timeout:   global.HttpClientTimeout,
-		Transport: global.TransportWithProxy(""),
+		Transport: global.TransportWithProxy(Channel.ProxyUrl),
 		Jar:       global.CookieJar,
 	}
 	req, err := http.NewRequest(http.MethodGet, liveInfo.LiveUrl, nil)

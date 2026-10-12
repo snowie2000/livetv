@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	"github.com/snowie2000/livetv/global"
@@ -28,7 +29,8 @@ func M3UHandler(c *gin.Context) {
 	// verify token against the unique token of the requested channel
 	if !disableProtection {
 		token := c.Query("token")
-		if token != global.GetSecretToken() { // invalid token
+		secretToken := global.GetSecretToken()
+		if secretToken == "" || token != secretToken { // invalid token
 			c.String(http.StatusForbidden, "Forbidden")
 			return
 		}
@@ -48,7 +50,8 @@ func TXTHandler(c *gin.Context) {
 	// verify token against the unique token of the requested channel
 	if !disableProtection {
 		token := c.Query("token")
-		if token != global.GetSecretToken() { // invalid token
+		secretToken := global.GetSecretToken()
+		if secretToken == "" || token != secretToken { // invalid token
 			c.String(http.StatusForbidden, "Forbidden")
 			return
 		}
@@ -124,7 +127,7 @@ func LiveHandler(c *gin.Context) {
 			c.AbortWithError(http.StatusBadRequest, err)
 			return
 		}
-		if token != ch.Token { // invalid token
+		if ch.Token == "" || token != ch.Token { // invalid token
 			c.String(http.StatusForbidden, "Forbidden")
 			return
 		}
@@ -215,7 +218,7 @@ func LiveHandler(c *gin.Context) {
 			}
 			iTsTransformer, _ := parser.(service.TsTransformer)
 			// get m3u8 content and transcode into tsproxy link if needed
-			m3u8Body = service.M3U8Process(finalUrl, bodyString, proxyUrl, global.GetLiveToken(), channelInfo.Proxy, channelNumber,
+			m3u8Body = service.M3U8Process(finalUrl, bodyString, proxyUrl, global.GetLiveToken(), channelInfo.Proxy, channelCacheKey,
 				func(raw string, ts string) string {
 					if iTsTransformer == nil {
 						return ts
@@ -235,7 +238,8 @@ func M3U8ProxyHandler(c *gin.Context) {
 	disableProtection := os.Getenv("LIVETV_FREEACCESS") == "1"
 	if !disableProtection {
 		token := c.Query("token")
-		if token != global.GetLiveToken() {
+		liveToken := global.GetLiveToken()
+		if liveToken == "" || token != liveToken {
 			c.String(http.StatusForbidden, "Forbidden")
 			return
 		}
@@ -308,7 +312,9 @@ func M3U8ProxyHandler(c *gin.Context) {
 		// If gzipped, create a new gzip reader
 		reader, err = gzip.NewReader(resp.Body)
 		if err != nil {
-			panic(err)
+			log.Println("gzip error:", err)
+			c.AbortWithStatus(http.StatusBadGateway)
+			return
 		}
 		defer reader.Close()
 	} else {
@@ -319,7 +325,7 @@ func M3U8ProxyHandler(c *gin.Context) {
 	io.Copy(buffer, reader)
 	// make prefixURL from ourselves
 	// prefixUrl, _ := global.GetConfig("base_url")
-	newList := service.M3U8Process(remoteURL, buffer.String(), "", global.GetLiveToken(), true, chNum, nil)
+	newList := service.M3U8Process(remoteURL, buffer.String(), "", global.GetLiveToken(), true, c.Query("c"), nil)
 	c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 	c.Writer.Header().Set("Access-Control-Allow-Methods", "*")
 	c.Data(http.StatusOK, "application/vnd.apple.mpegurl", []byte(newList))
@@ -330,7 +336,8 @@ func TsProxyHandler(c *gin.Context) {
 	disableProtection := os.Getenv("LIVETV_FREEACCESS") == "1"
 	if !disableProtection {
 		token := c.Query("token")
-		if token != global.GetLiveToken() {
+		liveToken := global.GetLiveToken()
+		if liveToken == "" || token != liveToken {
 			c.String(http.StatusForbidden, "Forbidden")
 			return
 		}
@@ -351,6 +358,7 @@ func TsProxyHandler(c *gin.Context) {
 	rurl, err := url.Parse(remoteURL)
 	if err != nil {
 		c.AbortWithError(http.StatusBadRequest, err)
+		return
 	}
 	channelInfo, err := service.GetChannel(chNum, chSub)
 	if err != nil {
@@ -412,7 +420,8 @@ func ReverseProxyHandler(c *gin.Context) {
 	disableProtection := os.Getenv("LIVETV_FREEACCESS") == "1"
 	if !disableProtection {
 		token := c.Query("token")
-		if token != global.GetLiveToken() {
+		liveToken := global.GetLiveToken()
+		if liveToken == "" || token != liveToken {
 			c.String(http.StatusForbidden, "Forbidden")
 			return
 		}
@@ -445,6 +454,14 @@ func ReverseProxyHandler(c *gin.Context) {
 }
 
 func CacheHandler(c *gin.Context) {
+	if sessions.Default(c).Get("logined") != true {
+		token := c.Query("token")
+		secretToken := global.GetSecretToken()
+		if secretToken == "" || token != secretToken {
+			c.String(http.StatusUnauthorized, "Unauthorized")
+			return
+		}
+	}
 	var sb strings.Builder
 	global.URLCache.Range(func(k string, v *model.LiveInfo) bool {
 		sb.WriteString(k)

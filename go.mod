@@ -5,7 +5,6 @@ go 1.24.0
 toolchain go1.24.3
 
 require (
-	github.com/LgoLgo/geentrant v0.1.0
 	github.com/dlclark/regexp2 v1.11.5
 	github.com/fopina/net-proxy-httpconnect v0.0.0-20230320235234-11f65320b851
 	github.com/gin-contrib/sessions v1.0.4
@@ -23,6 +22,7 @@ require (
 	github.com/wk8/go-ordered-map/v2 v2.1.8
 	golang.org/x/crypto v0.43.0
 	golang.org/x/net v0.46.0
+	golang.org/x/sync v0.17.0
 	golang.org/x/text v0.30.0
 	google.golang.org/api v0.255.0
 	modernc.org/sqlite v1.37.1
@@ -93,7 +93,6 @@ require (
 	golang.org/x/image v0.27.0 // indirect
 	golang.org/x/mod v0.28.0 // indirect
 	golang.org/x/oauth2 v0.33.0 // indirect
-	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/tools v0.37.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251103181224-f26f9409b101 // indirect
