@@ -107,7 +107,17 @@ func FetchHandler(c *gin.Context) {
 		client.ImpersonateChrome()
 	}
 
-	req := client.R().SetBody(c.Request.Body)
+	req := client.R()
+	if c.Request.ContentLength > 0 && c.Request.ContentLength < 1024*1024*20 {
+		body, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			http.Error(c.Writer, err.Error(), http.StatusBadRequest)
+			return
+		}
+		req.DisableForceChunkedEncoding().SetBodyBytes(body)
+	} else {
+		req.SetBody(c.Request.Body)
+	}
 	headers := c.Request.Header
 	for key, value := range headers {
 		req.SetHeader(key, value[0])

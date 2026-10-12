@@ -57,7 +57,7 @@ func (p *RTMPParser) Parse(channel *model.Channel, prevLiveInfo *model.LiveInfo)
 	u, err := url.Parse(channel.URL)
 	if err != nil || !strings.EqualFold(u.Scheme, "rtmp") {
 		client := http.Client{
-			Timeout:   time.Second * 10,
+			Timeout:   time.Second * 30,
 			Transport: global.TransportWithProxy(channel.ProxyUrl),
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				return http.ErrUseLastResponse

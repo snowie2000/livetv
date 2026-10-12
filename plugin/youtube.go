@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	freq "github.com/imroc/req/v3"
 	"github.com/snowie2000/livetv/service"
 	"io"
 	"log"
@@ -15,8 +16,6 @@ import (
 
 	"github.com/snowie2000/livetv/global"
 	"github.com/snowie2000/livetv/model"
-
-	"github.com/dlclark/regexp2"
 )
 
 type Client struct {
@@ -75,7 +74,7 @@ type YoutubeExtraInfo struct {
 
 func isLive(m3u8Url string, proxyUrl string) bool {
 	client := http.Client{
-		Timeout:   time.Second * 10,
+		Timeout:   time.Second * 30,
 		Transport: global.TransportWithProxy(proxyUrl),
 		Jar:       global.CookieJar,
 	}
@@ -99,7 +98,7 @@ func isLive(m3u8Url string, proxyUrl string) bool {
 }
 
 func getVideoIdFromHtml(html string) string {
-	reg := regexp.MustCompile(`<meta\s+itemprop="identifier"\s+content="(.+?)"`)
+	reg := regexp.MustCompile(`"status":"LIKE","target":{"videoId":"(.+?)"`)
 	match := reg.FindStringSubmatch(html)
 	if len(match) < 2 {
 		return ""
@@ -133,46 +132,64 @@ func makeRequestBody(videoId string) *VideoRequest {
 	}
 }
 
-func parseUrl(liveUrl string, proxyUrl string) (*model.LiveInfo, error) {
-	client := http.Client{
-		Timeout:   time.Second * 10,
-		Transport: global.TransportWithProxy(proxyUrl),
-		Jar:       global.CookieJar,
-	}
-	req, err := http.NewRequest("GET", liveUrl, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", service.DefaultUserAgent)
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
+func parseUrl(liveUrl string, proxyUrl string, videoId string) (*model.LiveInfo, error) {
+	//client := http.Client{
+	//	Timeout:   time.Second * 30,
+	//	Transport: global.TransportWithProxy(proxyUrl),
+	//	Jar:       global.CookieJar,
+	//}
+
+	client := global.ReqClientWithProxy(proxyUrl).ImpersonateChrome()
+
+	log.Println("parsing url", liveUrl, "id", videoId)
+	getVideoIdFromUrl := func(url string) (string, error) {
+		req, err := http.NewRequest("GET", liveUrl, nil)
+		if err != nil {
+			return "", err
+		}
+		req.Header.Set("User-Agent", service.DefaultUserAgent)
+		resp, err := client.Do(req)
+		if err != nil {
+			return "", err
+		}
+
+		defer global.CloseBody(resp)
+		// DO not parse invalid response, parse HTML only
+		if resp.ContentLength > 10*1024*1024 || !strings.Contains(resp.Header.Get("Content-Type"), "html") {
+			return "", errors.New("invalid url")
+		}
+		content, _ := io.ReadAll(resp.Body)
+		scontent := string(content)
+		return getVideoIdFromHtml(scontent), nil // extract video id from the html metadata
 	}
 
-	defer global.CloseBody(resp)
-	// DO not parse invalid response, parse HTML only
-	if resp.ContentLength > 10*1024*1024 || !strings.Contains(resp.Header.Get("Content-Type"), "html") {
-		return nil, errors.New("invalid url")
+	if videoId == "" {
+		videoId, _ = getVideoIdFromUrl(liveUrl)
+		log.Println("Parsed videoId from html:", videoId)
 	}
-	content, _ := io.ReadAll(resp.Body)
-	scontent := string(content)
-	videoId := getVideoIdFromHtml(scontent) // extract video id from the html metadata
+	if videoId == "" {
+		return nil, errors.New("Stream not found")
+	}
 	bodyJson := makeRequestBody(videoId)
 	body := &bytes.Buffer{}
 	encoder := json.NewEncoder(body)
 	encoder.Encode(bodyJson)
-	req, _ = http.NewRequest("POST", "https://www.youtube.com/youtubei/v1/player?prettyPrint=false", body)
-	req.Header.Set("User-Agent", userAgent)
-	req.Header.Set("X-Youtube-Client-Name", "3")
-	req.Header.Set("X-Youtube-Client-Version", "20.10.38")
-	jsonResp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
+	req := freq.R()
+	req.SetURL("https://www.youtube.com/youtubei/v1/player?prettyPrint=false").SetBodyBytes(body.Bytes())
+	req.Method = http.MethodPost
+	//req, _ := http.NewRequest("POST", "https://www.youtube.com/youtubei/v1/player?prettyPrint=false", body)
+	req.SetHeader("User-Agent", userAgent)
+	req.SetHeader("X-Youtube-Client-Name", "3")
+	req.SetHeader("X-Youtube-Client-Version", "20.10.38")
+	jsonResp := req.Do()
+	//jsonResp, err := client.Do(req)
+	//if err != nil {
+	//	return nil, err
+	//}
 	defer global.CloseBody(jsonResp)
 	var videoResp VideoResponse
 	decoder := json.NewDecoder(jsonResp.Body)
-	err = decoder.Decode(&videoResp)
+	err := decoder.Decode(&videoResp)
 	if err != nil {
 		return nil, err
 	}
@@ -189,18 +206,19 @@ func parseUrl(liveUrl string, proxyUrl string) (*model.LiveInfo, error) {
 	}
 
 	logo := ""
-	logoexp := regexp2.MustCompile(`(?<=owner":{"videoOwnerRenderer":{"thumbnail":{"thumbnails":\[{"url":")[^=]*`, 0)
-	logomatches, _ := logoexp.FindStringMatch(scontent)
-	if logomatches != nil {
-		logo = logomatches.Groups()[0].Captures[0].String()
-	}
+	//logoexp := regexp2.MustCompile(`(?<=owner":{"videoOwnerRenderer":{"thumbnail":{"thumbnails":\[{"url":")[^=]*`, 0)
+	//logomatches, _ := logoexp.FindStringMatch(scontent)
+	//if logomatches != nil {
+	//	logo = logomatches.Groups()[0].Captures[0].String()
+	//}
 	var ei YoutubeExtraInfo
-	videoexp := regexp2.MustCompile(`"og:url"\s*content="(.+?)"`, 0)
-	urlmatches, _ := videoexp.FindStringMatch(scontent)
-	if urlmatches != nil {
-		ei.LastUrl = urlmatches.Groups()[1].Captures[0].String()
-		log.Println("found the real url for video:", ei.LastUrl)
-	}
+	//videoexp := regexp2.MustCompile(`"og:url"\s*content="(.+?)"`, 0)
+	//urlmatches, _ := videoexp.FindStringMatch(scontent)
+	//if urlmatches != nil {
+	//	ei.LastUrl = urlmatches.Groups()[1].Captures[0].String()
+	//	log.Println("found the real url for video:", ei.LastUrl)
+	//}
+	ei.LastUrl = "https://www.youtube.com/watch?v=" + videoId
 	sExtra, _ := json.Marshal(&ei)
 
 	li := &model.LiveInfo{}
@@ -222,13 +240,14 @@ func (p *YoutubeParser) Parse(channel *model.Channel, prevLiveInfo *model.LiveIn
 	var info YoutubeExtraInfo
 	json.Unmarshal([]byte(previousExtraInfo), &info)
 	// for generic urls like "youtube.com/@channel/live", we try last url first, then the generic url
-	if service.GetYouTubeVideoID(channel.URL) == "" && info.LastUrl != "" {
-		if li, err := parseUrl(info.LastUrl, channel.ProxyUrl); err == nil {
+	vid := service.GetYouTubeVideoID(channel.URL)
+	if vid == "" && info.LastUrl != "" {
+		if li, err := parseUrl(info.LastUrl, channel.ProxyUrl, vid); err == nil {
 			log.Println("Reused last url for video interpretation:", info.LastUrl)
 			return li, err
 		}
 	}
-	return parseUrl(channel.URL, channel.ProxyUrl)
+	return parseUrl(channel.URL, channel.ProxyUrl, vid)
 }
 
 func init() {

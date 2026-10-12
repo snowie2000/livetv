@@ -3,12 +3,13 @@
 package plugin
 
 import (
-	"github.com/snowie2000/livetv/service"
 	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/snowie2000/livetv/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/snowie2000/livetv/global"
@@ -22,11 +23,13 @@ func (p *RepeaterParser) Host(c *gin.Context, info *model.LiveInfo, chInfo *mode
 	return nil
 }
 
+// repeater will keep following redirections until it reaches the end or was blocked (by Geolock or anything) and returns the final address
 func (p *RepeaterParser) Parse(channel *model.Channel, prevLiveInfo *model.LiveInfo) (*model.LiveInfo, error) {
 	u, err := url.Parse(channel.URL)
 	if err != nil {
 		return nil, err
 	}
+
 	// return non http protocol directly
 	if !strings.EqualFold(u.Scheme, "http") && !strings.EqualFold(u.Scheme, "https") {
 		li := &model.LiveInfo{}
@@ -35,7 +38,7 @@ func (p *RepeaterParser) Parse(channel *model.Channel, prevLiveInfo *model.LiveI
 	}
 
 	client := http.Client{
-		Timeout:   time.Second * 10,
+		Timeout:   time.Second * 30,
 		Transport: global.TransportWithProxy(channel.ProxyUrl),
 		Jar:       global.CookieJar,
 	}
@@ -46,7 +49,10 @@ func (p *RepeaterParser) Parse(channel *model.Channel, prevLiveInfo *model.LiveI
 	req.Header.Set("User-Agent", service.DefaultUserAgent)
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		li := &model.LiveInfo{}
+		li.LiveUrl = channel.URL
+		return li, nil
+		//return nil, err
 	}
 
 	liveUrl := resp.Request.URL.String() // replace source url with potentially redirected url

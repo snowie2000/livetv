@@ -2,9 +2,9 @@
 package global
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
@@ -138,18 +138,48 @@ func TransportWithProxy(proxyUrl string) *http.Transport {
 	return tr
 }
 
+func ReqClientWithProxy(proxyURL string) *freq.Client {
+	client := freq.C()
+
+	if proxyURL == "" {
+		return client
+	}
+
+	u, err := url.Parse(proxyURL)
+	if err != nil {
+		log.Println("Proxy URL parse error:", err)
+		return client
+	}
+
+	p, err := proxy.FromURL(u, dialer)
+	if err != nil {
+		log.Println("Proxy setup error:", err)
+		return client
+	}
+
+	tr := client.GetTransport()
+
+	tr.DisableKeepAlives = true
+
+	tr.SetDial(func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return p.Dial(network, addr)
+	})
+
+	return client
+}
+
 func CloseBody(resp any) {
 	if resp, ok := resp.(*http.Response); ok {
 		if resp != nil && resp.Body != nil {
 			// if the body is already read in some scenarios, the below operation becomes a no-op
-			_, _ = io.Copy(io.Discard, resp.Body)
+			//_, _ = io.Copy(io.Discard, resp.Body)
 			_ = resp.Body.Close()
 		}
 	}
 	if resp, ok := resp.(*freq.Response); ok {
 		if resp != nil && resp.Body != nil {
 			// if the body is already read in some scenarios, the below operation becomes a no-op
-			_, _ = io.Copy(io.Discard, resp.Body)
+			//_, _ = io.Copy(io.Discard, resp.Body)
 			_ = resp.Body.Close()
 			//fmt.Println("freq response closed")
 		}

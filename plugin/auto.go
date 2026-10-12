@@ -4,14 +4,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/snowie2000/livetv/global"
-	"github.com/snowie2000/livetv/model"
-	"github.com/snowie2000/livetv/service"
 	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/snowie2000/livetv/global"
+	"github.com/snowie2000/livetv/model"
+	"github.com/snowie2000/livetv/service"
 )
 
 type ParserDetector struct {
@@ -51,7 +52,7 @@ func (p *ParserDetector) Detect(channel *model.Channel) (string, error) {
 
 	previousExtraInfo := channel.Extra
 	client := http.Client{
-		Timeout:   time.Second * 10,
+		Timeout:   time.Second * 30,
 		Transport: global.TransportWithProxy(channel.ProxyUrl),
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse

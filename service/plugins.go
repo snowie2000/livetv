@@ -81,6 +81,7 @@ var (
 	NoMatchPlugin error                 = errors.New("No matching plugin found")
 	NoMatchFeed   error                 = errors.New("This channel is not currently live")
 	RetryOutdated error                 = errors.New("Channel data is outdated")
+	ErrorCooldown error                 = errors.New("Waiting for next retry")
 )
 
 const (

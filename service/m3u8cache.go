@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"log"
+	"time"
 
 	"github.com/LgoLgo/geentrant"
 	"github.com/snowie2000/livetv/global"
@@ -11,6 +12,12 @@ import (
 
 var updateConcurrent = &greetrant.RecursiveMutex{}
 var parseCanceler func(chId int) = nil
+var backoffMap = make(map[string]*BackOffInfo)
+
+type BackOffInfo struct {
+	Duration  time.Duration
+	Allowance time.Time
+}
 
 // cancel the parser if the channel or its sub channel is being parsed.
 func CancelChannelParser(chId int) {
@@ -64,6 +71,12 @@ func UpdateURLCacheSingle(channel *model.Channel, bUpdateStatus bool) (*model.Li
 	defer func() {
 		updateConcurrent.Unlock()
 	}()
+	if backoff, ok := backoffMap[channel.URL]; ok {
+		if time.Now().Before(backoff.Allowance) {
+			UpdateStatus(channel.URL, Error, ErrorCooldown.Error())
+			return nil, ErrorCooldown
+		}
+	}
 	log.Println("caching", channel.URL)
 	liveInfo, err := RealLiveM3U8(channel)
 	if err != nil {
@@ -74,7 +87,23 @@ func UpdateURLCacheSingle(channel *model.Channel, bUpdateStatus bool) (*model.Li
 			UpdateStatus(channel.URL, Error, err.Error())
 		}
 		log.Println("[LiveTV]", err)
+		// postpone the next retry in an exponential backoff
+		if backoff, ok := backoffMap[channel.URL]; ok {
+			backoff.Allowance = time.Now().Add(backoff.Duration)
+			backoff.Duration *= 2
+			// 10min at most
+			if backoff.Duration > 10*time.Minute {
+				backoff.Duration = 10 * time.Minute
+			}
+		} else {
+			// if it failed for the first time, set it up
+			backoffMap[channel.URL] = &BackOffInfo{
+				Allowance: time.Now().Add(time.Second * 5),
+				Duration:  time.Second * 5,
+			}
+		}
 	} else {
+		delete(backoffMap, channel.URL) // clear backoff record
 		// cache parsed result
 		global.URLCache.Store(channel.URL, liveInfo)
 		if bUpdateStatus {

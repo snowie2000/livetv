@@ -29,7 +29,7 @@ func (p *URLM3U8Parser) Parse(channel *model.Channel, prevLiveInfo *model.LiveIn
 	}
 
 	client := http.Client{
-		Timeout:   time.Second * 10,
+		Timeout:   time.Second * 30,
 		Transport: global.TransportWithProxy(channel.ProxyUrl),
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
