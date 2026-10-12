@@ -84,68 +84,48 @@ func ParseFromReader(f io.Reader) (Playlist, error) {
 			playlist.Tracks = append(playlist.Tracks, *track)
 		} else if strings.HasPrefix(line, "#EXT-X-STREAM-INF") {
 			line := strings.Replace(line, "#EXT-X-STREAM-INF:", "", -1)
-			streamInfo := strings.Split(line, ",")
+			streamInfo := splitAttributes(line)
 			if len(streamInfo) < 1 {
 				return Playlist{},
 					errors.New("invalid m3u file format. Expected EXT-X-STREAM-INF metadata to contain bitrate data")
 			}
 			stream := &VariantStream{}
 			for _, param := range streamInfo {
-				if strings.HasPrefix(param, "BANDWIDTH") {
-					bandwidth := strings.Split(streamInfo[1], "=")[1]
-					bandwidthInt, parseErr := strconv.Atoi(bandwidth)
-					if parseErr != nil {
-						return Playlist{}, errors.New("unable to parse bandwidth")
+				kv := strings.SplitN(param, "=", 2)
+				if len(kv) < 2 {
+					continue
+				}
+				key := strings.TrimSpace(kv[0])
+				val := strings.Trim(strings.TrimSpace(kv[1]), "\"")
+				switch key {
+				case "BANDWIDTH":
+					if bw, err := strconv.Atoi(val); err == nil {
+						stream.Bandwidth = bw
 					}
-					stream.Bandwidth = bandwidthInt
-				}
-				if strings.HasPrefix(param, "AVERAGE-BANDWIDTH") {
-					averageBandwidth := strings.Split(streamInfo[1], "=")[1]
-					averageBandwidthInt, parseErr := strconv.Atoi(averageBandwidth)
-					if parseErr != nil {
-						return Playlist{}, errors.New("unable to parse average bandwidth")
+				case "AVERAGE-BANDWIDTH":
+					if abw, err := strconv.Atoi(val); err == nil {
+						stream.AverageBandwith = abw
 					}
-					stream.AverageBandwith = averageBandwidthInt
-				}
-				if strings.HasPrefix(param, "CODECS") {
-					codecs := strings.Split(streamInfo[1], "=")[1]
-					stream.Codecs = codecs
-				}
-				if strings.HasPrefix(param, "RESOLUTION") {
-					resolution := strings.Split(streamInfo[1], "=")[1]
-					stream.Resolution = resolution
-				}
-				if strings.HasPrefix(param, "FRAME-RATE") {
-					frameRate := strings.Split(streamInfo[1], "=")[1]
-					frameRateFloat, parseErr := strconv.ParseFloat(frameRate, 64)
-					if parseErr != nil {
-						return Playlist{}, errors.New("unable to parse frame rate")
+				case "CODECS":
+					stream.Codecs = val
+				case "RESOLUTION":
+					stream.Resolution = val
+				case "FRAME-RATE":
+					if fr, err := strconv.ParseFloat(val, 64); err == nil {
+						stream.FrameRate = fr
 					}
-					stream.FrameRate = frameRateFloat
-				}
-				if strings.HasPrefix(param, "HDCP-LEVEL") {
-					hdcpLevel := strings.Split(streamInfo[1], "=")[1]
-					stream.HdcpLevel = hdcpLevel
-				}
-				if strings.HasPrefix(param, "VIDEO") {
-					video := strings.Split(streamInfo[1], "=")[1]
-					stream.Video = video
-				}
-				if strings.HasPrefix(param, "AUDIO") {
-					audio := strings.Split(streamInfo[1], "=")[1]
-					stream.Audio = audio
-				}
-				if strings.HasPrefix(param, "SUBTITLES") {
-					subtitle := strings.Split(streamInfo[1], "=")[1]
-					stream.Subtitle = subtitle
-				}
-				if strings.HasPrefix(param, "CLOSED-CAPTIONS") {
-					closedCaptions := strings.Split(streamInfo[1], "=")[1]
-					stream.ClosedCaptions = closedCaptions
-				}
-				if strings.HasPrefix(param, "NAME") {
-					name := strings.Split(streamInfo[1], "=")[1]
-					stream.Name = name
+				case "HDCP-LEVEL":
+					stream.HdcpLevel = val
+				case "VIDEO":
+					stream.Video = val
+				case "AUDIO":
+					stream.Audio = val
+				case "SUBTITLES":
+					stream.Subtitle = val
+				case "CLOSED-CAPTIONS":
+					stream.ClosedCaptions = val
+				case "NAME":
+					stream.Name = val
 				}
 			}
 			playlist.VariantStreams = append(playlist.VariantStreams, *stream)
@@ -218,4 +198,33 @@ func MarshallInto(p Playlist, into *bufio.Writer) error {
 	}
 
 	return into.Flush()
+}
+
+func splitAttributes(s string) []string {
+	var result []string
+	var current strings.Builder
+	inQuotes := false
+
+	for _, r := range s {
+		switch r {
+		case '"':
+			inQuotes = !inQuotes
+			current.WriteRune(r)
+		case ',':
+			if inQuotes {
+				current.WriteRune(r)
+			} else {
+				if current.Len() > 0 {
+					result = append(result, current.String())
+					current.Reset()
+				}
+			}
+		default:
+			current.WriteRune(r)
+		}
+	}
+	if current.Len() > 0 {
+		result = append(result, current.String())
+	}
+	return result
 }

@@ -25,7 +25,7 @@ func (p *M3USearcher) Parse(channel *model.Channel, prevLiveInfo *model.LiveInfo
 		chMap := syncx.NewHashedSlice[*model.Channel]()
 		idx := 0
 		for _, it := range parsedList {
-			channel := &model.Channel{
+			subCh := &model.Channel{
 				ID:        idx,
 				ParentID:  channel.ChannelID,
 				ChannelID: fmt.Sprintf("%d-%d", channel.ID, idx),

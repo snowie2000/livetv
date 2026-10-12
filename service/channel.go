@@ -63,17 +63,10 @@ func GetAllChannel() (channels []*model.Channel, err error) {
 	return
 }
 
-func SaveChannel(channel *model.Channel) error {
-	DeleteChannel(channel.ID)
-	// clear children info before saving
-	children := channel.Children
-	channel.Children = []*model.Channel{}
-	err := global.DB.Save(channel).Error
-	channel.Children = children
-	return err
-}
-
-func DeleteChannel(id int) error {
+func clearChannelCache(id int) {
+	if id <= 0 {
+		return
+	}
 	var keys []string
 	CancelChannelParser(id) // cancel the parser
 	// iterate and delete the channel and all its subchannels
@@ -88,6 +81,26 @@ func DeleteChannel(id int) error {
 	for _, key := range keys {
 		global.ChannelCache.Delete(key)
 	}
+}
+
+func SaveChannel(channel *model.Channel) error {
+	global.DBWriteMu.Lock()
+	defer global.DBWriteMu.Unlock()
+
+	clearChannelCache(channel.ID)
+	// clear children info before saving
+	children := channel.Children
+	channel.Children = []*model.Channel{}
+	err := global.DB.Save(channel).Error
+	channel.Children = children
+	return err
+}
+
+func DeleteChannel(id int) error {
+	global.DBWriteMu.Lock()
+	defer global.DBWriteMu.Unlock()
+
+	clearChannelCache(id)
 	return global.DB.Delete(model.Channel{}, "id = ?", id).Error
 }
 

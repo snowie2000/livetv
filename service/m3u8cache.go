@@ -4,14 +4,17 @@ import (
 	"errors"
 	"log"
 	"time"
+	"sync"
 
-	"github.com/LgoLgo/geentrant"
 	"github.com/snowie2000/livetv/global"
 	"github.com/snowie2000/livetv/model"
+	"golang.org/x/sync/singleflight"
 )
 
-var updateConcurrent = &greetrant.RecursiveMutex{}
-var parseCanceler func(chId int) = nil
+var (
+	cacheGroup singleflight.Group
+	cancelers  sync.Map
+)
 var backoffMap = make(map[string]*BackOffInfo)
 
 type BackOffInfo struct {
@@ -21,9 +24,26 @@ type BackOffInfo struct {
 
 // cancel the parser if the channel or its sub channel is being parsed.
 func CancelChannelParser(chId int) {
-	if parseCanceler != nil {
-		parseCanceler(chId)
+	if canceler, ok := cancelers.Load(chId); ok {
+		if fn, ok := canceler.(func()); ok {
+			fn()
 	}
+}
+}
+
+func runConcurrentUpdates(channels []*model.Channel) {
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 6)
+	for _, v := range channels {
+		wg.Add(1)
+		go func(ch *model.Channel) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			UpdateURLCacheSingle(ch, true)
+		}(v)
+	}
+	wg.Wait()
 }
 
 func LoadChannelCache() {
@@ -32,9 +52,7 @@ func LoadChannelCache() {
 		log.Println(err)
 		return
 	}
-	for _, v := range channels {
-		UpdateURLCacheSingle(v, true)
-	}
+	runConcurrentUpdates(channels)
 	InvalidateChannelCache()
 }
 
@@ -43,18 +61,13 @@ func UpdateSubChannels(parentChannel *model.Channel, liveInfo *model.LiveInfo, P
 	if p, err := GetPlugin(Parser); err == nil {
 		if provider, ok := p.(ChannalProvider); ok {
 			subchannels := provider.Channels(parentChannel, liveInfo)
-			canceled := false
 			if len(subchannels) > 0 {
+			canceled := false
+				cancelers.Store(parentChannel.ID, func() {
+					canceled = true
+				})
+				defer cancelers.Delete(parentChannel.ID)
 				// create a canceler
-				parseCanceler = func(chId int) {
-					if chId == parentChannel.ID {
-						canceled = true
-					}
-				}
-				defer func() {
-					parseCanceler = nil
-				}()
-			}
 			for _, ch := range subchannels {
 				if canceled {
 					log.Println("Channel has been removed")
@@ -65,12 +78,10 @@ func UpdateSubChannels(parentChannel *model.Channel, liveInfo *model.LiveInfo, P
 		}
 	}
 }
+}
 
 func UpdateURLCacheSingle(channel *model.Channel, bUpdateStatus bool) (*model.LiveInfo, error) {
-	updateConcurrent.Lock()
-	defer func() {
-		updateConcurrent.Unlock()
-	}()
+	res, err, _ := cacheGroup.Do(channel.URL, func() (any, error) {
 	if backoff, ok := backoffMap[channel.URL]; ok {
 		if time.Now().Before(backoff.Allowance) {
 			UpdateStatus(channel.URL, Error, ErrorCooldown.Error())
@@ -117,6 +128,14 @@ func UpdateURLCacheSingle(channel *model.Channel, bUpdateStatus bool) (*model.Li
 		}
 	}
 	return liveInfo, err
+	})
+	if err != nil {
+		return nil, err
+}
+	if res == nil {
+		return nil, nil
+	}
+	return res.(*model.LiveInfo), nil
 }
 
 func UpdateURLCache() {
@@ -138,8 +157,6 @@ func UpdateURLCache() {
 		}
 		return true
 	})
-	for _, v := range channels {
-		UpdateURLCacheSingle(v, true)
-	}
+	runConcurrentUpdates(channels)
 	InvalidateChannelCache()
 }

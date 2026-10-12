@@ -6,7 +6,6 @@ import (
 	"flag"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
@@ -66,7 +65,6 @@ func main() {
 		binding = *listen
 		os.Setenv("LIVETV_LISTEN", binding)
 	}
-	rand.Seed(time.Now().UnixNano())
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	log.Println("Server listen", binding)
 	log.Println("Server datadir", datadir)
@@ -100,11 +98,12 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.Default()
 	store := cookie.NewStore([]byte(sessionSecert))
-	/* CORS */
-	/*config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"http://localhost:8000"}
-	config.AllowCredentials = true
-	router.Use(cors.New(config))*/
+	store.Options(sessions.Options{
+		Path:     "/",
+		MaxAge:   86400 * 7,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	})
 	router.Use(sessions.Sessions("mysession", store))
 	// router.Static("/", "./web")
 	route.Register(router)

@@ -16,23 +16,31 @@ func Register(r *gin.Engine) {
 	r.GET("/playlist.m3u8", handler.M3U8ProxyHandler)
 	r.GET("/cache.txt", handler.CacheHandler)
 
-	r.GET("/api/channels", handler.ChannelListHandler)
-	r.GET("/api/plugins", handler.PluginListHandler)
+	// Public APIs
 	r.GET("/api/crsf", handler.CRSFHandler)
-	r.POST("/api/newchannel", handler.NewChannelHandler)
-	r.POST("/api/updatechannel", handler.UpdateChannelHandler)
-	r.GET("/api/getconfig", handler.GetConfigHandler)
-	r.GET("/api/delchannel", handler.DeleteChannelHandler)
-	r.POST("/api/updconfig", handler.UpdateConfigHandler)
-	r.GET("/api/auth", handler.AuthProbeHandler)
-	r.GET("/api/category", handler.CategoryHandler)
-	r.GET("/log", handler.LogHandler)
-	// r.GET("/login", handler.LoginViewHandler)
 	r.POST("/api/login", handler.LoginActionHandler)
-	r.GET("/api/logout", handler.LogoutHandler)
-	r.POST("/api/changepwd", handler.ChangePasswordHandler)
 	r.GET("/api/captcha", handler.CaptchaHandler)
-	r.GET("/", handler.IndexHandler)
 	r.Any("/fetch", handler.FetchHandler)
+
+	// Protected Admin APIs
+	admin := r.Group("/")
+	admin.Use(handler.AuthRequired())
+	{
+		admin.GET("/api/channels", handler.ChannelListHandler)
+		admin.GET("/api/plugins", handler.PluginListHandler)
+		admin.POST("/api/newchannel", handler.NewChannelHandler)
+		admin.POST("/api/updatechannel", handler.UpdateChannelHandler)
+		admin.GET("/api/getconfig", handler.GetConfigHandler)
+		admin.GET("/api/delchannel", handler.DeleteChannelHandler)
+		admin.POST("/api/updconfig", handler.UpdateConfigHandler)
+		admin.GET("/api/auth", handler.AuthProbeHandler)
+		admin.GET("/api/category", handler.CategoryHandler)
+		admin.GET("/log", handler.LogHandler)
+		admin.GET("/api/logout", handler.LogoutHandler)
+		admin.POST("/api/changepwd", handler.ChangePasswordHandler)
+	}
+
+	// Static Web UI routes
+	r.GET("/", handler.IndexHandler)
 	r.GET("/:path", handler.IndexHandler)
 }
