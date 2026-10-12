@@ -39,8 +39,8 @@ func (p *M3USearcher) Parse(channel *model.Channel, prevLiveInfo *model.LiveInfo
 				TsProxy:   channel.TsProxy,
 				Extra:     channel.Extra,
 			}
-			channel.CustomQueryString = fmt.Sprintf("sid=%s", channel.Digest())
-			if chMap.Add(channel) == nil { // ignore duplicate channels
+			subCh.CustomQueryString = fmt.Sprintf("sid=%s", subCh.Digest())
+			if chMap.Add(subCh) == nil { // ignore duplicate channels
 				idx++
 			}
 		}
